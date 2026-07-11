@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "922708808396",
+    "project_id": "kgra-ba502",
+    "storage_bucket": "kgra-ba502.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:922708808396:android:4c4f46130e05fc8d716869",
+        "android_client_info": {
+          "package_name": "com.vexora.kgra"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBfPup4nYLkejFDe9vUueRpVlQGy1sVj_g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

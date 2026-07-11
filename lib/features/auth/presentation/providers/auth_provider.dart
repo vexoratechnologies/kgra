@@ -1,0 +1,382 @@
+import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import '../../data/models/user_model.dart';
+import '../../data/repositories/auth_repository.dart';
+
+/// AuthProvider manages the state of login, OTP verification, and registration.
+/// 
+/// It exposes parameters for loading, errors, user approval status, and auth state.
+class AuthProvider extends ChangeNotifier {
+  final AuthRepository _authRepository;
+
+  AuthProvider({required AuthRepository authRepository})
+      : _authRepository = authRepository;
+
+  // UI state variables
+  bool _isLoading = false;
+  String? _error;
+  UserModel? _currentUser;
+  
+  // Verification states
+  String? _verificationPhone;
+  String? _tempName;
+  String? _tempDesignation;
+  String? _tempInstitution;
+  String? _tempPhotoBase64;
+  String? _tempZone;
+  String? _tempDateOfBirth;
+  String? _tempMembershipId;
+  String? _tempDateOfRetirement;
+  bool _isVerificationCompleted = false;
+  bool _isRegistered = false;
+  bool _isPendingApproval = false;
+
+  // Getters
+  bool get isLoading => _isLoading;
+  String? get error => _error;
+  UserModel? get currentUser => _currentUser;
+  String? get verificationPhone => _verificationPhone;
+  bool get isVerificationCompleted => _isVerificationCompleted;
+  bool get isRegistered => _isRegistered;
+  bool get isPendingApproval => _isPendingApproval;
+  bool get isAuthenticated => _currentUser != null && _currentUser!.isApproved;
+
+  /// Sets loading state and notifies listeners
+  void _setLoading(bool value) {
+    _isLoading = value;
+    notifyListeners();
+  }
+
+  /// Sets error state and notifies listeners
+  void _setError(String? message) {
+    _error = message;
+    notifyListeners();
+  }
+
+  /// Clear all local auth states (e.g. on starting over or errors)
+  void clearStates() {
+    _error = null;
+    _verificationPhone = null;
+    _tempName = null;
+    _tempDesignation = null;
+    _tempInstitution = null;
+    _tempPhotoBase64 = null;
+    _tempZone = null;
+    _tempDateOfBirth = null;
+    _tempMembershipId = null;
+    _tempDateOfRetirement = null;
+    _isVerificationCompleted = false;
+    _isRegistered = false;
+    _isPendingApproval = false;
+    notifyListeners();
+  }
+
+  /// Checks if an active session is running on app launch.
+  Future<void> checkAuthStatus() async {
+    _setLoading(true);
+    _setError(null);
+
+    // 1. Try to restore instantly from local SharedPreferences cache
+    try {
+      final cachedUser = _authRepository.getCachedUser();
+      if (cachedUser != null) {
+        _currentUser = cachedUser;
+        _isRegistered = true;
+        _isPendingApproval = !cachedUser.isApproved;
+        notifyListeners(); // Route immediately to prevent screen flickers
+      }
+    } catch (e) {
+      debugPrint('Failed to load cached user session: $e');
+    }
+
+    // 2. Perform background fetch from remote database to check latest approval/details
+    try {
+      final user = await _authRepository.getCurrentUser();
+      if (user != null) {
+        _currentUser = user;
+        _isRegistered = true;
+        _isPendingApproval = !user.isApproved;
+      } else {
+        // If user was deleted/revoked, log out
+        _currentUser = null;
+        _isRegistered = false;
+        _isPendingApproval = false;
+        await _authRepository.clearUserCache();
+      }
+      notifyListeners();
+    } catch (e) {
+      if (_currentUser == null) {
+        _setError('Failed to restore login session: ${e.toString()}');
+      } else {
+        debugPrint('Failed to refresh session from server (working offline): $e');
+      }
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Checks if a user is registered under the given mobile number.
+  Future<bool> checkUserExists(String phoneNumber) async {
+    _setLoading(true);
+    _setError(null);
+    try {
+      final exists = await _authRepository.checkUserExists(phoneNumber);
+      _setLoading(false);
+      return exists;
+    } catch (e) {
+      _setError('Failed to check user existence: ${e.toString()}');
+      _setLoading(false);
+      return false;
+    }
+  }
+
+  /// Sets the active verification phone number state.
+  void setVerificationPhone(String? phone) {
+    _verificationPhone = phone;
+    notifyListeners();
+  }
+
+  /// Triggers standard OTP generation/lookup logic.
+  Future<bool> sendOtp(String phoneNumber, {
+    String? tempName,
+    String? tempDesignation,
+    String? tempInstitution,
+    String? tempPhotoBase64,
+    String? tempZone,
+    String? tempDateOfBirth,
+    String? tempMembershipId,
+    String? tempDateOfRetirement,
+  }) async {
+    _setLoading(true);
+    _setError(null);
+    try {
+      _verificationPhone = phoneNumber;
+      _tempName = tempName;
+      _tempDesignation = tempDesignation;
+      _tempInstitution = tempInstitution;
+      _tempPhotoBase64 = tempPhotoBase64;
+      _tempZone = tempZone;
+      _tempDateOfBirth = tempDateOfBirth;
+      _tempMembershipId = tempMembershipId;
+      _tempDateOfRetirement = tempDateOfRetirement;
+      await _authRepository.sendOtp(phoneNumber);
+      _setLoading(false);
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      _setLoading(false);
+      return false;
+    }
+  }
+
+  /// Verifies the OTP, signs in, and checks Firestore status.
+  Future<bool> verifyOtp(String code) async {
+    if (_verificationPhone == null) {
+      _setError('Missing verification phone number.');
+      return false;
+    }
+    
+    _setLoading(true);
+    _setError(null);
+    try {
+      final user = await _authRepository.verifyOtp(_verificationPhone!, code);
+      
+      _isVerificationCompleted = true;
+      if (user == null) {
+        // Verified but not registered in USERS DB
+        _isRegistered = false;
+        _isPendingApproval = false;
+        
+        // If they entered a registration name, register them immediately!
+        if (_tempName != null && _tempName!.isNotEmpty) {
+          final registered = await _registerWithUidAndName(
+            _tempName!,
+            designation: _tempDesignation,
+            institution: _tempInstitution,
+            photoBase64: _tempPhotoBase64,
+            zone: _tempZone,
+            dateOfBirth: _tempDateOfBirth,
+            membershipId: _tempMembershipId,
+            dateOfRetirement: _tempDateOfRetirement,
+          );
+          if (!registered) {
+            _setLoading(false);
+            return false;
+          }
+        }
+      } else {
+        _isRegistered = true;
+        if (user.isApproved && user.status == 'approved') {
+          _currentUser = user;
+          _isPendingApproval = false;
+        } else {
+          _currentUser = null;
+          _isPendingApproval = true;
+        }
+      }
+      _setLoading(false);
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      _setLoading(false);
+      return false;
+    }
+  }
+
+  /// Helper registration action called internally after verification.
+  Future<bool> _registerWithUidAndName(
+    String fullName, {
+    String? designation,
+    String? institution,
+    String? photoBase64,
+    String? zone,
+    String? dateOfBirth,
+    String? membershipId,
+    String? dateOfRetirement,
+  }) async {
+    final uid = _authRepository.getCurrentUid();
+    if (uid == null) {
+      _setError('Security session expired.');
+      return false;
+    }
+    try {
+      String? profileImageId;
+      if (photoBase64 != null && photoBase64.isNotEmpty) {
+        profileImageId = 'img_$uid';
+        await _authRepository.saveUserImage(profileImageId, photoBase64);
+      }
+
+      final newUser = UserModel(
+        uid: uid,
+        name: fullName,
+        phoneNumber: _verificationPhone!,
+        designation: designation,
+        institution: institution,
+        profileImageId: profileImageId,
+        isApproved: false,
+        status: 'pending',
+        createdAt: DateTime.now(),
+        zone: zone,
+        dateOfBirth: dateOfBirth,
+        membershipId: membershipId,
+        dateOfRetirement: dateOfRetirement,
+      );
+      await _authRepository.registerUser(newUser);
+      _isRegistered = true;
+      _isPendingApproval = true;
+      return true;
+    } catch (e) {
+      _setError('Registration failed: ${e.toString()}');
+      return false;
+    }
+  }
+
+  /// Registers a new user. The number verified in OTP is saved.
+  Future<bool> registerUser(
+    String fullName, {
+    String? designation,
+    String? institution,
+    String? photoBase64,
+    String? zone,
+    String? dateOfBirth,
+    String? membershipId,
+    String? dateOfRetirement,
+  }) async {
+    if (_verificationPhone == null) {
+      _setError('No verified phone number found. Try verifying OTP first.');
+      return false;
+    }
+
+    final uid = _authRepository.getCurrentUid();
+    if (uid == null) {
+      _setError('Security session expired. Please verify OTP again.');
+      return false;
+    }
+
+    _setLoading(true);
+    _setError(null);
+    try {
+      String? profileImageId;
+      if (photoBase64 != null && photoBase64.isNotEmpty) {
+        profileImageId = 'img_$uid';
+        await _authRepository.saveUserImage(profileImageId, photoBase64);
+      }
+
+      final newUser = UserModel(
+        uid: uid,
+        name: fullName,
+        phoneNumber: _verificationPhone!,
+        designation: designation,
+        institution: institution,
+        profileImageId: profileImageId,
+        isApproved: false,
+        status: 'pending',
+        createdAt: DateTime.now(),
+        zone: zone,
+        dateOfBirth: dateOfBirth,
+        membershipId: membershipId,
+        dateOfRetirement: dateOfRetirement,
+      );
+
+      await _authRepository.registerUser(newUser);
+      
+      _isRegistered = true;
+      _isPendingApproval = true;
+      _setLoading(false);
+      return true;
+    } catch (e) {
+      _setError('Registration failed: ${e.toString()}');
+      _setLoading(false);
+      return false;
+    }
+  }
+
+  /// Checks Firestore approval status if user is currently in pending state.
+  Future<void> checkApprovalStatus() async {
+    _setLoading(true);
+    _setError(null);
+    try {
+      final user = await _authRepository.getCurrentUser();
+      if (user != null && user.isApproved && user.status == 'approved') {
+        _currentUser = user;
+        _isPendingApproval = false;
+      }
+    } catch (e) {
+      _setError('Failed to check approval status: ${e.toString()}');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Simulates admin approval locally when in mock mode.
+  Future<void> simulateMockApproval() async {
+    if (Firebase.apps.isNotEmpty) return;
+    if (_verificationPhone == null) return;
+    
+    _setLoading(true);
+    try {
+      final user = await _authRepository.verifyOtp(_verificationPhone!, '123456');
+      if (user != null) {
+        final approvedUser = user.copyWith(isApproved: true, status: 'approved');
+        await _authRepository.registerUser(approvedUser);
+        _isPendingApproval = false;
+        _currentUser = approvedUser;
+      }
+    } catch (_) {}
+    _setLoading(false);
+  }
+
+  /// Logs the user out and clears states.
+  Future<void> signOut() async {
+    _setLoading(true);
+    try {
+      await _authRepository.signOut();
+      _currentUser = null;
+      clearStates();
+    } catch (e) {
+      _setError(e.toString());
+    } finally {
+      _setLoading(false);
+    }
+  }
+}
