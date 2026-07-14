@@ -31,11 +31,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   String _activeTab = 'Zonal Admins';
   final _adminFormKey = GlobalKey<FormState>();
   final _zoneFormKey = GlobalKey<FormState>();
+  final _designationFormKey = GlobalKey<FormState>();
   
   final _adminUsernameController = TextEditingController();
   final _adminPasswordController = TextEditingController();
   String? _selectedAdminZone;
   final _zoneNameController = TextEditingController();
+  final _designationNameController = TextEditingController();
 
   @override
   void initState() {
@@ -55,12 +57,14 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     _adminUsernameController.dispose();
     _adminPasswordController.dispose();
     _zoneNameController.dispose();
+    _designationNameController.dispose();
     super.dispose();
   }
 
   void _refreshData() {
     context.read<AdminProvider>().fetchAdmins();
     context.read<AdminProvider>().fetchZones();
+    context.read<AdminProvider>().fetchDesignations();
     context.read<MeetingMinutesProvider>().fetchAllMinutes();
     context.read<AdProvider>().fetchAds();
   }
@@ -102,6 +106,19 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       _zoneNameController.clear();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Zone added successfully'), backgroundColor: Colors.green),
+      );
+    }
+  }
+
+  Future<void> _handleAddDesignation() async {
+    if (!_designationFormKey.currentState!.validate()) return;
+    
+    final name = _designationNameController.text.trim();
+    final success = await context.read<AdminProvider>().addDesignation(name);
+    if (success && mounted) {
+      _designationNameController.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Designation added successfully'), backgroundColor: Colors.green),
       );
     }
   }
@@ -158,6 +175,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   const SizedBox(height: AppSpacing.lg),
                   _buildSidebarItem('Zonal Admins', Icons.people_outline),
                   _buildSidebarItem('Zones', Icons.map_outlined),
+                  _buildSidebarItem('Designations', Icons.badge_outlined),
                   _buildSidebarItem('Minutes Approvals', Icons.approval_outlined),
                   _buildSidebarItem('Ads Carousel', Icons.photo_library_outlined),
                 ],
@@ -200,6 +218,8 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         return _buildZonalAdminsView(adminProvider);
       case 'Zones':
         return _buildZonesView(adminProvider);
+      case 'Designations':
+        return _buildDesignationsView(adminProvider);
       case 'Minutes Approvals':
         return _buildMinutesApprovalsView(pendingMinutes);
       case 'Ads Carousel':
@@ -742,6 +762,99 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildDesignationsView(AdminProvider adminProvider) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Add Designation Form
+        Expanded(
+          flex: 2,
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: AppRadius.borderLg,
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Form(
+              key: _designationFormKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Add New Designation',
+                    style: AppTextStyle.headlineSm(color: AppColors.brandPrimary).copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  
+                  Text('Designation Name', style: AppTextStyle.labelSm(color: AppColors.brandSecondary)),
+                  const SizedBox(height: AppSpacing.xs),
+                  TextFormField(
+                    controller: _designationNameController,
+                    decoration: const InputDecoration(hintText: 'e.g. President'),
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Designation name required' : null,
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: _handleAddDesignation,
+                      child: const Text('Add Designation', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.xl),
+        
+        // Designations List
+        Expanded(
+          flex: 3,
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: AppRadius.borderLg,
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Active Designations',
+                  style: AppTextStyle.headlineSm(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Expanded(
+                  child: adminProvider.designations.isEmpty
+                      ? const Center(child: Text('No active designations found.'))
+                      : ListView.builder(
+                          itemCount: adminProvider.designations.length,
+                          itemBuilder: (context, index) {
+                            final designation = adminProvider.designations[index];
+                            return ListTile(
+                              title: Text(designation, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete, color: AppColors.error),
+                                onPressed: () => adminProvider.deleteDesignation(designation),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

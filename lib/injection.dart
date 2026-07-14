@@ -43,13 +43,13 @@ Future<void> initInjection() async {
 
   // Services
   locator.registerLazySingleton<FirestoreService>(
-    () => FirestoreService(prefs: locator<SharedPreferences>()),
+    () => FirestoreService(),
   );
   locator.registerLazySingleton<AuthenticationService>(
-    () => AuthenticationService(prefs: locator<SharedPreferences>()),
+    () => AuthenticationService(),
   );
   locator.registerLazySingleton<StorageService>(
-    () => StorageService(prefs: locator<SharedPreferences>()),
+    () => StorageService(),
   );
 
   // Repositories

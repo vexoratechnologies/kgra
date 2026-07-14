@@ -15,6 +15,7 @@ class AdminProvider extends ChangeNotifier {
   AdminModel? _currentAdmin;
   List<AdminModel> _admins = [];
   List<String> _zones = [];
+  List<String> _designations = [];
 
   List<UserModel> _pendingUsers = [];
   List<UserModel> _approvedUsers = [];
@@ -29,6 +30,7 @@ class AdminProvider extends ChangeNotifier {
   AdminModel? get currentAdmin => _currentAdmin;
   List<AdminModel> get admins => _admins;
   List<String> get zones => _zones;
+  List<String> get designations => _designations;
 
   List<UserModel> get pendingUsers => _pendingUsers;
   List<UserModel> get approvedUsers => _approvedUsers;
@@ -258,6 +260,41 @@ class AdminProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _setError('Failed to delete zone: ${e.toString()}');
+      return false;
+    }
+  }
+
+  Future<void> fetchDesignations() async {
+    _setLoading(true);
+    try {
+      _designations = await _adminRepository.getDesignations();
+    } catch (e) {
+      _setError('Failed to fetch designations: ${e.toString()}');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> addDesignation(String name) async {
+    _setError(null);
+    try {
+      await _adminRepository.saveDesignation(name);
+      await fetchDesignations();
+      return true;
+    } catch (e) {
+      _setError('Failed to add designation: ${e.toString()}');
+      return false;
+    }
+  }
+
+  Future<bool> deleteDesignation(String name) async {
+    _setError(null);
+    try {
+      await _adminRepository.deleteDesignation(name);
+      await fetchDesignations();
+      return true;
+    } catch (e) {
+      _setError('Failed to delete designation: ${e.toString()}');
       return false;
     }
   }

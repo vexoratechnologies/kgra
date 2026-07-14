@@ -29,8 +29,13 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleSendOtp() async {
     if (!_formKey.currentState!.validate()) return;
     
-    final phone = _phoneController.text.trim();
-    // Build full number with country code prefix
+    String phone = _phoneController.text.trim();
+    if (phone.startsWith('+91')) {
+      phone = phone.substring(3);
+    } else if (phone.startsWith('91') && phone.length > 10) {
+      phone = phone.substring(2);
+    }
+    phone = phone.replaceAll(RegExp(r'\D'), '');
     final fullPhoneNumber = '+91$phone';
     
     final authProvider = context.read<AuthProvider>();
@@ -38,6 +43,16 @@ class _LoginScreenState extends State<LoginScreen> {
     
     // Check if the user is registered first
     final exists = await authProvider.checkUserExists(fullPhoneNumber);
+    
+    if (authProvider.error != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.error!),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
     
     if (!exists && mounted) {
       authProvider.setVerificationPhone(fullPhoneNumber);

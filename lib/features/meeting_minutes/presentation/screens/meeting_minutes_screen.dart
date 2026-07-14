@@ -5,6 +5,8 @@ import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_style.dart';
 import '../../../../core/widgets/app_pdf_viewer_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/routes/app_routes.dart';
 import '../providers/meeting_minutes_provider.dart';
 
 class MeetingMinutesScreen extends StatefulWidget {
@@ -48,6 +50,16 @@ class _MeetingMinutesScreenState extends State<MeetingMinutesScreen> {
         foregroundColor: AppColors.brandSecondary,
         elevation: 0,
         scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(AppRoutes.home);
+            }
+          },
+        ),
       ),
       body: SafeArea(
         child: Column(

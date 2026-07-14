@@ -111,7 +111,7 @@ class AppRoutes {
 
   /// Global GoRouter instance configuration
   static final GoRouter router = GoRouter(
-    initialLocation: splash,
+    initialLocation: superAdminSplash,
     routes: [
       GoRoute(
         path: splash,
@@ -342,6 +342,16 @@ class _PlaceholderScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(AppRoutes.home);
+            }
+          },
+        ),
       ),
       body: Center(
         child: Column(

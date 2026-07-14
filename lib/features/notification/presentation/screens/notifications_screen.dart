@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_style.dart';
+import '../../../../core/routes/app_routes.dart';
 import '../providers/notification_provider.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -36,6 +37,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         foregroundColor: AppColors.brandSecondary,
         elevation: 0,
         scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(AppRoutes.home);
+            }
+          },
+        ),
       ),
       body: SafeArea(
         child: provider.isLoading
@@ -81,7 +92,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 borderRadius: AppRadius.borderLg,
                                 onTap: () {
                                   if (n.routingPath.isNotEmpty) {
-                                    context.go(n.routingPath);
+                                    context.push(n.routingPath);
                                   }
                                 },
                                 child: Padding(

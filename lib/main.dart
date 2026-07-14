@@ -16,13 +16,11 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
-    // Automatically establish an anonymous session on Web to prevent permission issues
-    if (kIsWeb) {
-      final auth = FirebaseAuth.instance;
-      if (auth.currentUser == null) {
-        await auth.signInAnonymously();
-        debugPrint('Established anonymous session on startup.');
-      }
+    // Automatically establish an anonymous session to prevent permission issues
+    final auth = FirebaseAuth.instance;
+    if (auth.currentUser == null) {
+      await auth.signInAnonymously();
+      debugPrint('Established anonymous session on startup.');
     }
   } catch (e) {
     debugPrint('Firebase not initialized: $e');

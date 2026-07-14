@@ -54,7 +54,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   // Mock Settings States
   bool _autoApprove = false;
-  bool _localMockDB = true;
   String _clearanceLevel = 'General';
 
   @override
@@ -89,6 +88,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     context.read<FormsCircularsProvider>().fetchAllForms();
     context.read<ZonalProvider>().fetchMembers();
     provider.fetchZones();
+    provider.fetchDesignations();
     context.read<UpdatesProvider>().fetchUpdates();
     context.read<LiveSessionProvider>().fetchLiveSessions();
     context.read<GalleryProvider>().fetchImages();
@@ -395,6 +395,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               ),
               onPressed: () {
                 if (isMobile) Navigator.pop(context);
+                context.read<AdminProvider>().logoutAdmin();
                 context.go(AppRoutes.login);
               },
               icon: const Icon(Icons.arrow_back, size: 16),
@@ -1280,17 +1281,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         onChanged: (val) => setState(() => _autoApprove = val),
                       ),
                       const Divider(height: 32),
-                      SwitchListTile.adaptive(
-                        title: const Text(
-                          'Fallback Local Mock Database',
-                          style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.brandSecondary),
-                        ),
-                        subtitle: const Text('Stores changes offline in local storage when Firebase is unreachable'),
-                        value: _localMockDB,
-                        activeColor: AppColors.brandPrimary,
-                        onChanged: (val) => setState(() => _localMockDB = val),
-                      ),
-                      const Divider(height: 32),
                       ListTile(
                         title: const Text(
                           'Security Clearance Level',
@@ -1471,10 +1461,14 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   void _showCommitteeMemberDialog(BuildContext context, {CommitteeMemberModel? member}) {
     final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController(text: member?.name ?? '');
-    final desCtrl = TextEditingController(text: member?.designation ?? '');
     final phoneCtrl = TextEditingController(text: member?.phoneNumber ?? '');
     final emailCtrl = TextEditingController(text: member?.email ?? '');
     String? photoBase64 = member?.photoBase64;
+    final designations = context.read<AdminProvider>().designations;
+    String? selectedDesignation = member?.designation;
+    if (selectedDesignation == null && designations.isNotEmpty) {
+      selectedDesignation = designations.first;
+    }
 
     showDialog(
       context: context,
@@ -1516,10 +1510,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                       ),
                       const SizedBox(height: 12),
-                      TextFormField(
-                        controller: desCtrl,
+                      DropdownButtonFormField<String>(
+                        value: selectedDesignation,
                         decoration: const InputDecoration(labelText: 'Designation *'),
-                        validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                        items: designations.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                        onChanged: (val) => setDialogState(() => selectedDesignation = val),
+                        validator: (v) => v == null ? 'Required' : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -1547,7 +1543,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       final newMember = CommitteeMemberModel(
                         id: member?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
                         name: nameCtrl.text.trim(),
-                        designation: desCtrl.text.trim(),
+                        designation: selectedDesignation ?? '',
                         phoneNumber: phoneCtrl.text.trim(),
                         email: emailCtrl.text.trim(),
                         photoBase64: photoBase64,
@@ -1601,7 +1597,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Meeting Minutes Archive',
+                'Meeting Minutes ArchiveRRR',
                 style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold),
               ),
               ElevatedButton.icon(
@@ -2510,11 +2506,15 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   void _showZonalMemberDialog(BuildContext context, {ZonalMemberModel? member}) {
     final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController(text: member?.name ?? '');
-    final desCtrl = TextEditingController(text: member?.designation ?? '');
     final phoneCtrl = TextEditingController(text: member?.phoneNumber ?? '');
     final emailCtrl = TextEditingController(text: member?.email ?? '');
     String? selectedZone = member?.zone;
     String? photoBase64 = member?.photoBase64;
+    final designations = context.read<AdminProvider>().designations;
+    String? selectedDesignation = member?.designation;
+    if (selectedDesignation == null && designations.isNotEmpty) {
+      selectedDesignation = designations.first;
+    }
 
     final zones = context.read<AdminProvider>().zones;
     if (selectedZone == null && zones.isNotEmpty) {
@@ -2561,10 +2561,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                       ),
                       const SizedBox(height: 12),
-                      TextFormField(
-                        controller: desCtrl,
+                      DropdownButtonFormField<String>(
+                        value: selectedDesignation,
                         decoration: const InputDecoration(labelText: 'Designation *'),
-                        validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                        items: designations.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                        onChanged: (val) => setDialogState(() => selectedDesignation = val),
+                        validator: (v) => v == null ? 'Required' : null,
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
@@ -2600,7 +2602,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       final newMember = ZonalMemberModel(
                         id: member?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
                         name: nameCtrl.text.trim(),
-                        designation: desCtrl.text.trim(),
+                        designation: selectedDesignation ?? '',
                         phoneNumber: phoneCtrl.text.trim(),
                         email: emailCtrl.text.trim(),
                         zone: selectedZone!,

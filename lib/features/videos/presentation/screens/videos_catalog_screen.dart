@@ -42,6 +42,16 @@ class _VideosCatalogScreenState extends State<VideosCatalogScreen> {
         foregroundColor: AppColors.brandSecondary,
         elevation: 0,
         scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(AppRoutes.home);
+            }
+          },
+        ),
       ),
       body: SafeArea(
         child: provider.isLoading

@@ -29,6 +29,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _membershipIdController = TextEditingController();
   final _retirementController = TextEditingController();
   String? _selectedZone;
+  String? _selectedDesignation;
   String? _photoBase64;
   final _picker = ImagePicker();
   final _formKey = GlobalKey<FormState>();
@@ -38,6 +39,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AdminProvider>().fetchZones();
+      context.read<AdminProvider>().fetchDesignations();
     });
     final authProvider = context.read<AuthProvider>();
     if (authProvider.verificationPhone != null && authProvider.verificationPhone!.length >= 10) {
@@ -95,7 +97,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final name = _nameController.text.trim();
-    final phone = _phoneController.text.trim();
+    String phone = _phoneController.text.trim();
+    if (phone.startsWith('+91')) {
+      phone = phone.substring(3);
+    } else if (phone.startsWith('91') && phone.length > 10) {
+      phone = phone.substring(2);
+    }
+    phone = phone.replaceAll(RegExp(r'\D'), '');
     final designation = _designationController.text.trim();
     final institution = _institutionController.text.trim();
     final zone = _selectedZone;
@@ -332,18 +340,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                         ),
                         const SizedBox(height: AppSpacing.sm),
-                        TextFormField(
-                          controller: _designationController,
-                          keyboardType: TextInputType.text,
-                          decoration: const InputDecoration(
-                            hintText: 'Enter your designation',
-                            prefixIcon: Icon(Icons.badge_outlined),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Designation is required';
+                        Consumer<AdminProvider>(
+                          builder: (context, adminProv, child) {
+                            final designationsList = adminProv.designations;
+                            String? currentVal = _selectedDesignation;
+                            if (currentVal != null && !designationsList.contains(currentVal)) {
+                              currentVal = null;
                             }
-                            return null;
+                            return DropdownButtonFormField<String>(
+                              value: currentVal,
+                              hint: const Text('Select your designation'),
+                              decoration: const InputDecoration(
+                                prefixIcon: Icon(Icons.badge_outlined),
+                              ),
+                              items: designationsList.map((d) => DropdownMenuItem(
+                                value: d,
+                                child: Text(d),
+                              )).toList(),
+                              onChanged: (val) {
+                                setState(() {
+                                  _selectedDesignation = val;
+                                  if (val != null) {
+                                    _designationController.text = val;
+                                  }
+                                });
+                              },
+                              validator: (value) => value == null ? 'Designation is required' : null,
+                            );
                           },
                         ),
                         

@@ -60,4 +60,16 @@ class AdminRepository {
   Future<void> deleteZone(String name) async {
     await _firestoreService.deleteZone(name);
   }
+
+  Future<List<String>> getDesignations() async {
+    return await _firestoreService.getDesignations();
+  }
+
+  Future<void> saveDesignation(String name) async {
+    await _firestoreService.saveDesignation(name);
+  }
+
+  Future<void> deleteDesignation(String name) async {
+    await _firestoreService.deleteDesignation(name);
+  }
 }
