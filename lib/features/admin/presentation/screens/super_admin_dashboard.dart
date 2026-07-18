@@ -45,7 +45,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final currentAdmin = context.read<AdminProvider>().currentAdmin;
       if (currentAdmin == null || currentAdmin.role != 'super_admin') {
-        context.go(AppRoutes.adminLogin);
+        context.go(AppRoutes.superAdminLogin);
       } else {
         _refreshData();
       }
@@ -154,7 +154,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             icon: const Icon(Icons.logout),
             onPressed: () {
               context.read<AdminProvider>().logoutAdmin();
-              context.go(AppRoutes.adminLogin);
+              context.go(AppRoutes.superAdminLogin);
             },
             tooltip: 'Log Out',
           ),

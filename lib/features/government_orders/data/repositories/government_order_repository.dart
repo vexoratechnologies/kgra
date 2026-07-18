@@ -2,6 +2,9 @@ import 'dart:typed_data';
 import '../../../../core/services/firestore_service.dart';
 import '../../../../core/services/storage_service.dart';
 import '../../../../core/constants/firestore_constants.dart';
+import '../../../../core/routes/app_routes.dart';
+import '../../../../core/services/push_notification_service.dart';
+import '../../../notification/data/models/notification_model.dart';
 import '../models/government_order_model.dart';
 
 class GovernmentOrderRepository {
@@ -29,6 +32,23 @@ class GovernmentOrderRepository {
       FirestoreCollections.governmentOrders,
       model.id,
       updatedModel.toJson(),
+    );
+
+    // Save system notification
+    final notification = NotificationModel(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: 'New Government Order Added',
+      body: model.title,
+      routingPath: AppRoutes.governmentOrders,
+      createdAt: DateTime.now().toIso8601String(),
+    );
+    await _firestoreService.saveNotification(notification);
+
+    // Trigger push notification broadcast
+    await PushNotificationService.instance.sendBroadcastNotification(
+      title: 'New Government Order Added',
+      body: model.title,
+      routingPath: AppRoutes.governmentOrders,
     );
   }
 

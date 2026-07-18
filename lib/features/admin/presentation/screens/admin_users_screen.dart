@@ -31,7 +31,8 @@ import '../../../../features/gallery/presentation/providers/gallery_provider.dar
 import '../../../../features/gallery/data/models/gallery_image_model.dart';
 import '../../../../features/videos/presentation/providers/video_provider.dart';
 import '../../../../features/videos/data/models/video_model.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../features/events/presentation/providers/event_provider.dart';
+import '../../../../features/events/data/models/event_model.dart';
 import '../providers/admin_provider.dart';
 import '../../../notification/presentation/providers/notification_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -61,7 +62,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final currentAdmin = context.read<AdminProvider>().currentAdmin;
-      if (currentAdmin == null) {
+      if (currentAdmin == null || currentAdmin.role != 'zonal_admin') {
+        context.read<AdminProvider>().logoutAdmin();
         context.go(AppRoutes.adminLogin);
       } else {
         _refreshAllData();
@@ -92,10 +94,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     context.read<UpdatesProvider>().fetchUpdates();
     context.read<LiveSessionProvider>().fetchLiveSessions();
     context.read<GalleryProvider>().fetchImages();
-    final authUser = context.read<AuthProvider>().currentUser;
-    if (authUser != null) {
-      context.read<VideoProvider>().fetchVideos(authUser.uid);
-    }
+    context.read<VideoProvider>().fetchVideos();
+    context.read<EventProvider>().fetchEvents();
   }
 
   void _toggleExpand(UserModel user, AdminProvider provider) {
@@ -376,6 +376,10 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   label: 'Educational Videos',
                 ),
                 _buildSidebarItem(
+                  icon: Icons.event_outlined,
+                  label: 'Upcoming Events',
+                ),
+                _buildSidebarItem(
                   icon: Icons.settings_outlined,
                   label: 'Settings',
                 ),
@@ -396,7 +400,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               onPressed: () {
                 if (isMobile) Navigator.pop(context);
                 context.read<AdminProvider>().logoutAdmin();
-                context.go(AppRoutes.login);
+                context.go(AppRoutes.adminLogin);
               },
               icon: const Icon(Icons.arrow_back, size: 16),
               label: const Text('Back to Login'),
@@ -506,6 +510,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         return _buildGalleryView(context);
       case 'Educational Videos':
         return _buildEducationalVideosView(context);
+      case 'Upcoming Events':
+        return _buildUpcomingEventsView(context);
       case 'Settings':
         return _buildSettingsView(context);
       default:
@@ -3364,12 +3370,25 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                   child: Row(
                                     children: [
                                       Container(
-                                        padding: const EdgeInsets.all(10),
+                                        width: 80,
+                                        height: 60,
                                         decoration: BoxDecoration(
                                           color: Colors.blue.shade50,
                                           borderRadius: AppRadius.borderMd,
                                         ),
-                                        child: const Icon(Icons.video_library, color: Colors.blue, size: 24),
+                                        child: v.thumbnailUrl.isNotEmpty
+                                            ? ClipRRect(
+                                                borderRadius: AppRadius.borderMd,
+                                                child: Image.network(
+                                                  v.thumbnailUrl,
+                                                  width: 80,
+                                                  height: 60,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (context, error, stackTrace) =>
+                                                      const Center(child: Icon(Icons.video_library, color: Colors.blue, size: 24)),
+                                                ),
+                                              )
+                                            : const Center(child: Icon(Icons.video_library, color: Colors.blue, size: 24)),
                                       ),
                                       const SizedBox(width: AppSpacing.md),
                                       Expanded(
@@ -3382,7 +3401,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
-                                              'Duration: ${(v.duration ~/ 60)}m ${(v.duration % 60)}s | URL: ${v.videoUrl}',
+                                              v.duration > 0
+                                                  ? 'Duration: ${(v.duration ~/ 60)}m ${(v.duration % 60)}s | URL: ${v.videoUrl}'
+                                                  : 'URL: ${v.videoUrl}',
                                               style: const TextStyle(fontSize: 12, color: Colors.grey),
                                               overflow: TextOverflow.ellipsis,
                                             ),
@@ -3418,89 +3439,446 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final formKey = GlobalKey<FormState>();
     final titleCtrl = TextEditingController(text: video?.title ?? '');
     final descCtrl = TextEditingController(text: video?.description ?? '');
-    final urlCtrl = TextEditingController(text: video?.videoUrl ?? '');
-    final durCtrl = TextEditingController(text: video?.duration.toString() ?? '0');
+
+    Uint8List? videoBytes;
+    String videoName = video?.videoUrl.isNotEmpty == true ? video!.videoUrl.split('/').last.split('?').first : '';
+
+    Uint8List? thumbnailBytes;
+    String thumbnailName = video?.thumbnailUrl.isNotEmpty == true ? video!.thumbnailUrl.split('/').last.split('?').first : '';
+
+    bool isSaving = false;
+    double videoProgress = 0.0;
+    double thumbnailProgress = 0.0;
 
     showDialog(
       context: context,
       builder: (dialogCtx) {
-        return AlertDialog(
-          title: Text(video == null ? 'Upload Educational Video' : 'Edit Educational Video'),
-          content: SingleChildScrollView(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: titleCtrl,
-                    decoration: const InputDecoration(labelText: 'Title *'),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(video == null ? 'Upload Educational Video' : 'Edit Educational Video'),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: titleCtrl,
+                        decoration: const InputDecoration(labelText: 'Title *'),
+                        validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                      ),
+                      const SizedBox(height: 16),
+                      // Video Selector Row
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: isSaving
+                                  ? null
+                                  : () async {
+                                      final result = await FilePicker.platform.pickFiles(
+                                        type: FileType.video,
+                                        withData: true,
+                                      );
+                                      if (result != null && result.files.single.bytes != null) {
+                                        setDialogState(() {
+                                          videoBytes = result.files.single.bytes;
+                                          videoName = result.files.single.name;
+                                        });
+                                      }
+                                    },
+                              icon: const Icon(Icons.video_call),
+                              label: Text(videoBytes == null && video == null ? 'Pick Video *' : 'Change Video'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (videoName.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Video: $videoName',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      // Thumbnail Selector Row
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: isSaving
+                                  ? null
+                                  : () async {
+                                      final result = await FilePicker.platform.pickFiles(
+                                        type: FileType.image,
+                                        withData: true,
+                                      );
+                                      if (result != null && result.files.single.bytes != null) {
+                                        setDialogState(() {
+                                          thumbnailBytes = result.files.single.bytes;
+                                          thumbnailName = result.files.single.name;
+                                        });
+                                      }
+                                    },
+                              icon: const Icon(Icons.image),
+                              label: Text(thumbnailBytes == null && (video == null || video.thumbnailUrl.isEmpty) ? 'Pick Thumbnail' : 'Change Thumbnail'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (thumbnailName.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Thumbnail: $thumbnailName',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: descCtrl,
+                        maxLines: 3,
+                        decoration: const InputDecoration(labelText: 'Description (Optional)'),
+                      ),
+                      if (isSaving) ...[
+                        const SizedBox(height: 20),
+                        if (videoBytes != null) ...[
+                          Text('Uploading Video: ${(videoProgress * 100).toInt()}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 4),
+                          LinearProgressIndicator(value: videoProgress, color: AppColors.brandPrimary),
+                          const SizedBox(height: 12),
+                        ],
+                        if (thumbnailBytes != null) ...[
+                          Text('Uploading Thumbnail: ${(thumbnailProgress * 100).toInt()}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 4),
+                          LinearProgressIndicator(value: thumbnailProgress, color: Colors.amber),
+                          const SizedBox(height: 12),
+                        ],
+                        const Center(child: Text('Saving Educational Video...', style: TextStyle(fontSize: 12))),
+                      ]
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: urlCtrl,
-                    decoration: const InputDecoration(labelText: 'Video URL *'),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: durCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Duration (in seconds) *'),
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Required';
-                      if (int.tryParse(v) == null) return 'Must be an integer';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: descCtrl,
-                    maxLines: 3,
-                    decoration: const InputDecoration(labelText: 'Description (Optional)'),
-                  ),
-                ],
+                ),
               ),
-            ),
+              actions: [
+                TextButton(
+                  onPressed: isSaving ? null : () => Navigator.pop(dialogCtx),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          if (formKey.currentState!.validate()) {
+                            if (video == null && videoBytes == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please select a video file.')),
+                              );
+                              return;
+                            }
+                            
+                            setDialogState(() {
+                              isSaving = true;
+                              videoProgress = 0.0;
+                              thumbnailProgress = 0.0;
+                            });
+
+                            try {
+                              final newVideo = VideoModel(
+                                id: video?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                                title: titleCtrl.text.trim(),
+                                description: descCtrl.text.trim(),
+                                videoUrl: video?.videoUrl ?? '',
+                                thumbnailUrl: video?.thumbnailUrl ?? '',
+                                duration: video?.duration ?? 0,
+                                createdAt: video?.createdAt ?? DateTime.now().toIso8601String(),
+                              );
+                              
+                              bool success;
+                              if (video == null) {
+                                success = await context.read<VideoProvider>().addVideo(
+                                  newVideo,
+                                  videoBytes,
+                                  thumbnailBytes,
+                                  onVideoProgress: (p) {
+                                    setDialogState(() {
+                                      videoProgress = p;
+                                    });
+                                  },
+                                  onThumbnailProgress: (p) {
+                                    setDialogState(() {
+                                      thumbnailProgress = p;
+                                    });
+                                  },
+                                );
+                                if (success && dialogCtx.mounted) {
+                                  await dialogCtx.read<NotificationProvider>().sendSystemNotification(
+                                    title: 'New Educational Video',
+                                    body: newVideo.title,
+                                    routingPath: AppRoutes.videos,
+                                  );
+                                }
+                              } else {
+                                success = await context.read<VideoProvider>().updateVideo(
+                                  newVideo,
+                                  videoBytes,
+                                  thumbnailBytes,
+                                  onVideoProgress: (p) {
+                                    setDialogState(() {
+                                      videoProgress = p;
+                                    });
+                                  },
+                                  onThumbnailProgress: (p) {
+                                    setDialogState(() {
+                                      thumbnailProgress = p;
+                                    });
+                                  },
+                                );
+                              }
+                              
+                              if (success && dialogCtx.mounted) {
+                                Navigator.pop(dialogCtx);
+                              } else if (dialogCtx.mounted) {
+                                setDialogState(() {
+                                  isSaving = false;
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Failed to save educational video.')),
+                                );
+                              }
+                            } catch (e) {
+                              if (dialogCtx.mounted) {
+                                setDialogState(() {
+                                  isSaving = false;
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Error: ${e.toString()}')),
+                                );
+                              }
+                            }
+                          }
+                        },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildUpcomingEventsView(BuildContext context) {
+    final provider = context.watch<EventProvider>();
+    final events = provider.eventsList;
+
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.lg),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(bottom: BorderSide(color: AppColors.brandSecondary.withValues(alpha: 0.04), width: 1)),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogCtx),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (formKey.currentState!.validate()) {
-                  final newVideo = VideoModel(
-                    id: video?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-                    title: titleCtrl.text.trim(),
-                    description: descCtrl.text.trim(),
-                    videoUrl: urlCtrl.text.trim(),
-                    duration: int.parse(durCtrl.text.trim()),
-                    createdAt: video?.createdAt ?? DateTime.now().toIso8601String(),
-                  );
-                  bool success;
-                  if (video == null) {
-                    success = await context.read<VideoProvider>().addVideo(newVideo);
-                    if (success && dialogCtx.mounted) {
-                      await dialogCtx.read<NotificationProvider>().sendSystemNotification(
-                        title: 'New Educational Video',
-                        body: newVideo.title,
-                        routingPath: AppRoutes.videos,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Upcoming Events Management',
+                style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brandPrimary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: AppRadius.borderMd),
+                ),
+                onPressed: () => _showEventDialog(context),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add Event'),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: provider.isLoading
+              ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
+              : provider.error != null
+                  ? Center(child: Text(provider.error!, style: const TextStyle(color: AppColors.error)))
+                  : events.isEmpty
+                      ? const Center(child: Text('No upcoming events scheduled.'))
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(AppSpacing.xl),
+                          itemCount: events.length,
+                          itemBuilder: (context, index) {
+                            final e = events[index];
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                              child: _buildCardWrapper(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(AppSpacing.lg),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: Colors.amber.shade50,
+                                          borderRadius: AppRadius.borderMd,
+                                        ),
+                                        child: const Icon(Icons.event, color: Colors.amber, size: 24),
+                                      ),
+                                      const SizedBox(width: AppSpacing.md),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              e.title,
+                                              style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold, fontSize: 16),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              'Date: ${e.date} | Location: ${e.location}',
+                                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.edit, color: Colors.blue),
+                                        onPressed: () => _showEventDialog(context, event: e),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete, color: AppColors.error),
+                                        onPressed: () => _confirmDelete(
+                                          context,
+                                          title: 'Delete Event',
+                                          content: 'Are you sure you want to delete ${e.title}?',
+                                          onConfirm: () => provider.deleteEvent(e.id),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+        ),
+      ],
+    );
+  }
+
+  void _showEventDialog(BuildContext context, {EventModel? event}) {
+    final formKey = GlobalKey<FormState>();
+    final titleCtrl = TextEditingController(text: event?.title ?? '');
+    final locCtrl = TextEditingController(text: event?.location ?? '');
+    final dateCtrl = TextEditingController(text: event?.date ?? '');
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(event == null ? 'Schedule Upcoming Event' : 'Edit Upcoming Event'),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: titleCtrl,
+                        decoration: const InputDecoration(labelText: 'Event Title *'),
+                        validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: locCtrl,
+                        decoration: const InputDecoration(labelText: 'Location *'),
+                        validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: dateCtrl,
+                        readOnly: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Event Date *',
+                          suffixIcon: Icon(Icons.calendar_today),
+                        ),
+                        validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: event != null ? (DateTime.tryParse(event.date) ?? DateTime.now()) : DateTime.now(),
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked != null) {
+                            setDialogState(() {
+                              dateCtrl.text = DateFormat('yyyy-MM-dd').format(picked);
+                            });
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (formKey.currentState!.validate()) {
+                      final newEvent = EventModel(
+                        id: event?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                        title: titleCtrl.text.trim(),
+                        location: locCtrl.text.trim(),
+                        date: dateCtrl.text.trim(),
+                        createdAt: event?.createdAt ?? DateTime.now().toIso8601String(),
                       );
+                      
+                      bool success;
+                      if (event == null) {
+                        success = await context.read<EventProvider>().addEvent(newEvent);
+                        if (success && dialogCtx.mounted) {
+                          await dialogCtx.read<NotificationProvider>().sendSystemNotification(
+                            title: 'New Event Scheduled',
+                            body: '${newEvent.title} on ${newEvent.date}',
+                            routingPath: AppRoutes.notification,
+                          );
+                        }
+                      } else {
+                        success = await context.read<EventProvider>().updateEvent(newEvent);
+                      }
+                      
+                      if (success && dialogCtx.mounted) {
+                        Navigator.pop(dialogCtx);
+                      }
                     }
-                  } else {
-                    success = await context.read<VideoProvider>().updateVideo(newVideo);
-                  }
-                  if (success && dialogCtx.mounted) {
-                    Navigator.pop(dialogCtx);
-                  }
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

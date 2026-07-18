@@ -22,6 +22,7 @@ import '../../features/videos/presentation/screens/video_player_screen.dart';
 import '../../features/videos/data/models/video_model.dart';
 import '../../features/zonal/presentation/screens/zonal_committee_screen.dart';
 import '../../features/auth/presentation/screens/admin_login_screen.dart';
+import '../../features/auth/presentation/screens/super_admin_login_screen.dart';
 import '../../features/admin/presentation/screens/super_admin_dashboard.dart';
 
 /// AppRoutes defines all navigation routes and transition effects for the application.
@@ -40,6 +41,7 @@ class AppRoutes {
   static const String pending = '/pending';
   static const String adminUsers = '/admin-users';
   static const String adminLogin = '/admin/login';
+  static const String superAdminLogin = '/superadmin/login';
   static const String superAdminDashboard = '/admin/super-dashboard';
   
   static const String home = '/home';
@@ -111,7 +113,7 @@ class AppRoutes {
 
   /// Global GoRouter instance configuration
   static final GoRouter router = GoRouter(
-    initialLocation: superAdminSplash,
+    initialLocation: adminSplash,
     routes: [
       GoRoute(
         path: splash,
@@ -171,6 +173,14 @@ class AppRoutes {
           context: context,
           state: state,
           child: const AdminLoginScreen(),
+        ),
+      ),
+      GoRoute(
+        path: superAdminLogin,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          context: context,
+          state: state,
+          child: const SuperAdminLoginScreen(),
         ),
       ),
       GoRoute(

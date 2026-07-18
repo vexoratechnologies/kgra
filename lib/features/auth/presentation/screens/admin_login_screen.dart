@@ -35,17 +35,14 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     final password = _passwordController.text.trim();
 
     final adminProvider = context.read<AdminProvider>();
-    final success = await adminProvider.loginAdmin(username, password);
+    final success = await adminProvider.loginAdmin(
+      username,
+      password,
+      allowedRole: 'zonal_admin',
+    );
 
     if (success && mounted) {
-      final currentAdmin = adminProvider.currentAdmin;
-      if (currentAdmin != null) {
-        if (currentAdmin.role == 'super_admin') {
-          context.go(AppRoutes.superAdminDashboard);
-        } else {
-          context.go(AppRoutes.adminUsers);
-        }
-      }
+      context.go(AppRoutes.adminUsers);
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -109,7 +106,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                     const SizedBox(height: AppSpacing.md),
                     
                     Text(
-                      'Admin Console',
+                      'Zonal Admin Console',
                       style: AppTextStyle.headlineLgMobile(color: AppColors.brandSecondary).copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -146,7 +143,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Administrative Sign In',
+                            'Zonal Admin Sign In',
                             style: AppTextStyle.headlineSm(color: AppColors.brandPrimary).copyWith(
                               fontWeight: FontWeight.bold,
                             ),

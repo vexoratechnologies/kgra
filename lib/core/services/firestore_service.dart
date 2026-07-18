@@ -10,6 +10,7 @@ import '../../features/videos/data/models/video_model.dart';
 import '../../features/videos/data/models/video_progress_model.dart';
 import '../../features/gallery/data/models/gallery_image_model.dart';
 import '../../features/ads/data/models/ad_model.dart';
+import '../../features/events/data/models/event_model.dart';
 
 /// FirestoreService manages CRUD actions in Cloud Firestore.
 class FirestoreService {
@@ -517,6 +518,32 @@ class FirestoreService {
   Future<void> deleteAd(String id) async {
     await _firestore
         .collection(FirestoreCollections.ads)
+        .doc(id)
+        .delete();
+  }
+
+  // ==========================================
+  // Events Management
+  // ==========================================
+
+  Future<void> saveEvent(EventModel event) async {
+    await _firestore
+        .collection(FirestoreCollections.events)
+        .doc(event.id)
+        .set(event.toJson());
+  }
+
+  Future<List<EventModel>> getEvents() async {
+    final querySnapshot = await _firestore
+        .collection(FirestoreCollections.events)
+        .orderBy('date', descending: false)
+        .get();
+    return querySnapshot.docs.map((doc) => EventModel.fromJson(doc.data())).toList();
+  }
+
+  Future<void> deleteEvent(String id) async {
+    await _firestore
+        .collection(FirestoreCollections.events)
         .doc(id)
         .delete();
   }

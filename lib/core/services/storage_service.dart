@@ -85,6 +85,7 @@ class StorageService {
     required String docId,
     required String fileName,
     required Uint8List fileBytes,
+    Function(double progress)? onProgress,
   }) async {
     try {
       debugPrint('Initiating Firebase Storage ref for image $folderName / $docId.jpg');
@@ -99,9 +100,16 @@ class StorageService {
         SettableMetadata(contentType: 'image/jpeg'),
       );
 
-      final snapshot = await uploadTask.timeout(const Duration(seconds: 15), onTimeout: () {
-        throw TimeoutException('Firebase Storage upload timed out after 15 seconds.');
-      });
+      if (onProgress != null) {
+        uploadTask.snapshotEvents.listen((event) {
+          if (event.totalBytes > 0) {
+            final progress = event.bytesTransferred / event.totalBytes;
+            onProgress(progress);
+          }
+        });
+      }
+
+      final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
       return downloadUrl;
     } catch (e) {
@@ -126,5 +134,44 @@ class StorageService {
     required String url,
   }) async {
     await deletePdf(folderName: folderName, docId: docId, url: url);
+  }
+
+  /// Uploads a Video to Firebase Storage and returns the download URL.
+  Future<String> uploadVideo({
+    required String folderName,
+    required String docId,
+    required String fileName,
+    required Uint8List fileBytes,
+    Function(double progress)? onProgress,
+  }) async {
+    try {
+      debugPrint('Initiating Firebase Storage ref for video $folderName / $docId.mp4');
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child(folderName)
+          .child('$docId.mp4');
+
+      debugPrint('Calling putData with ${fileBytes.length} bytes');
+      final uploadTask = ref.putData(
+        fileBytes,
+        SettableMetadata(contentType: 'video/mp4'),
+      );
+
+      if (onProgress != null) {
+        uploadTask.snapshotEvents.listen((event) {
+          if (event.totalBytes > 0) {
+            final progress = event.bytesTransferred / event.totalBytes;
+            onProgress(progress);
+          }
+        });
+      }
+
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      debugPrint('Exception caught during uploadVideo: $e');
+      rethrow;
+    }
   }
 }

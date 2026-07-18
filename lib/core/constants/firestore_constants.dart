@@ -20,6 +20,7 @@ class FirestoreCollections {
   static const String videos = 'VIDEOS';
   static const String videoProgress = 'VIDEO_PROGRESS';
   static const String ads = 'ADS';
+  static const String events = 'EVENTS';
   static const String designations = 'DESIGNATIONS';
 }
 

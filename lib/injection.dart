@@ -29,6 +29,8 @@ import 'features/videos/data/repositories/video_repository.dart';
 import 'features/videos/presentation/providers/video_provider.dart';
 import 'features/ads/data/repositories/ad_repository.dart';
 import 'features/ads/presentation/providers/ad_provider.dart';
+import 'features/events/data/repositories/event_repository.dart';
+import 'features/events/presentation/providers/event_provider.dart';
 
 /// Global service locator instance.
 final GetIt locator = GetIt.instance;
@@ -117,6 +119,12 @@ Future<void> initInjection() async {
   locator.registerLazySingleton<VideoRepository>(
     () => VideoRepository(
       firestoreService: locator<FirestoreService>(),
+      storageService: locator<StorageService>(),
+    ),
+  );
+  locator.registerLazySingleton<EventRepository>(
+    () => EventRepository(
+      firestoreService: locator<FirestoreService>(),
     ),
   );
   locator.registerLazySingleton<AdRepository>(
@@ -165,5 +173,8 @@ Future<void> initInjection() async {
   );
   locator.registerFactory<AdProvider>(
     () => AdProvider(repository: locator<AdRepository>()),
+  );
+  locator.registerFactory<EventProvider>(
+    () => EventProvider(repository: locator<EventRepository>()),
   );
 }

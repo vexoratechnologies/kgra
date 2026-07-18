@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../../data/models/video_model.dart';
 import '../../data/models/video_progress_model.dart';
@@ -28,13 +29,17 @@ class VideoProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> fetchVideos(String userId) async {
+  Future<void> fetchVideos([String? userId]) async {
     _setLoading(true);
     _setError(null);
     try {
       _videos = await _repository.getVideos();
-      final progressList = await _repository.getUserVideoProgress(userId);
-      _progressMap = {for (var p in progressList) p.videoId: p};
+      if (userId != null && userId.isNotEmpty) {
+        final progressList = await _repository.getUserVideoProgress(userId);
+        _progressMap = {for (var p in progressList) p.videoId: p};
+      } else {
+        _progressMap = {};
+      }
     } catch (e) {
       _setError('Failed to fetch videos: ${e.toString()}');
     } finally {
@@ -42,12 +47,24 @@ class VideoProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> addVideo(VideoModel video) async {
+  Future<bool> addVideo(
+    VideoModel video,
+    Uint8List? videoBytes,
+    Uint8List? thumbnailBytes, {
+    Function(double progress)? onVideoProgress,
+    Function(double progress)? onThumbnailProgress,
+  }) async {
     _setError(null);
     try {
-      await _repository.saveVideo(video);
-      _videos.removeWhere((v) => v.id == video.id);
-      _videos.insert(0, video);
+      final updatedVideo = await _repository.saveVideo(
+        video,
+        videoBytes,
+        thumbnailBytes,
+        onVideoProgress: onVideoProgress,
+        onThumbnailProgress: onThumbnailProgress,
+      );
+      _videos.removeWhere((v) => v.id == updatedVideo.id);
+      _videos.insert(0, updatedVideo);
       notifyListeners();
       return true;
     } catch (e) {
@@ -56,13 +73,25 @@ class VideoProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> updateVideo(VideoModel video) async {
+  Future<bool> updateVideo(
+    VideoModel video,
+    Uint8List? videoBytes,
+    Uint8List? thumbnailBytes, {
+    Function(double progress)? onVideoProgress,
+    Function(double progress)? onThumbnailProgress,
+  }) async {
     _setError(null);
     try {
-      await _repository.saveVideo(video);
-      final idx = _videos.indexWhere((v) => v.id == video.id);
+      final updatedVideo = await _repository.saveVideo(
+        video,
+        videoBytes,
+        thumbnailBytes,
+        onVideoProgress: onVideoProgress,
+        onThumbnailProgress: onThumbnailProgress,
+      );
+      final idx = _videos.indexWhere((v) => v.id == updatedVideo.id);
       if (idx != -1) {
-        _videos[idx] = video;
+        _videos[idx] = updatedVideo;
       }
       notifyListeners();
       return true;

@@ -2,40 +2,40 @@ import '../../../../core/services/firestore_service.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/services/push_notification_service.dart';
 import '../../../notification/data/models/notification_model.dart';
-import '../models/update_model.dart';
+import '../models/event_model.dart';
 
-class UpdatesRepository {
+class EventRepository {
   final FirestoreService _firestoreService;
 
-  UpdatesRepository({required FirestoreService firestoreService})
+  EventRepository({required FirestoreService firestoreService})
       : _firestoreService = firestoreService;
 
-  Future<void> saveUpdate(UpdateModel update) async {
-    await _firestoreService.saveUpdate(update);
+  Future<void> saveEvent(EventModel event) async {
+    await _firestoreService.saveEvent(event);
 
     // Save system notification
     final notification = NotificationModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      title: 'New Update Added',
-      body: update.title,
-      routingPath: AppRoutes.updates,
+      title: 'New Event Scheduled',
+      body: '${event.title} on ${event.date}',
+      routingPath: AppRoutes.notification,
       createdAt: DateTime.now().toIso8601String(),
     );
     await _firestoreService.saveNotification(notification);
 
     // Trigger push notification broadcast
     await PushNotificationService.instance.sendBroadcastNotification(
-      title: 'New Update Added',
-      body: update.title,
-      routingPath: AppRoutes.updates,
+      title: 'New Event Scheduled',
+      body: '${event.title} on ${event.date}',
+      routingPath: AppRoutes.notification,
     );
   }
 
-  Future<List<UpdateModel>> getUpdates() async {
-    return await _firestoreService.getUpdates();
+  Future<List<EventModel>> getEvents() async {
+    return await _firestoreService.getEvents();
   }
 
-  Future<void> deleteUpdate(String id) async {
-    await _firestoreService.deleteUpdate(id);
+  Future<void> deleteEvent(String id) async {
+    await _firestoreService.deleteEvent(id);
   }
 }

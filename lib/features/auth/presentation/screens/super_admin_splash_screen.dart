@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/routes/app_routes.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/theme/app_text_style.dart';
 import '../../../admin/presentation/providers/admin_provider.dart';
 
 class SuperAdminSplashScreen extends StatefulWidget {
@@ -31,7 +29,7 @@ class _SuperAdminSplashScreenState extends State<SuperAdminSplashScreen> {
     if (currentAdmin != null && currentAdmin.role == 'super_admin') {
       context.go(AppRoutes.superAdminDashboard);
     } else {
-      context.go(AppRoutes.adminLogin);
+      context.go(AppRoutes.superAdminLogin);
     }
   }
 

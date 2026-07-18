@@ -3,6 +3,7 @@ class VideoModel {
   final String title;
   final String description;
   final String videoUrl;
+  final String thumbnailUrl;
   final int duration; // in seconds
   final String createdAt;
 
@@ -11,6 +12,7 @@ class VideoModel {
     required this.title,
     required this.description,
     required this.videoUrl,
+    this.thumbnailUrl = '',
     required this.duration,
     required this.createdAt,
   });
@@ -20,6 +22,7 @@ class VideoModel {
     String? title,
     String? description,
     String? videoUrl,
+    String? thumbnailUrl,
     int? duration,
     String? createdAt,
   }) {
@@ -28,6 +31,7 @@ class VideoModel {
       title: title ?? this.title,
       description: description ?? this.description,
       videoUrl: videoUrl ?? this.videoUrl,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
       duration: duration ?? this.duration,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -39,6 +43,7 @@ class VideoModel {
       'title': title,
       'description': description,
       'videoUrl': videoUrl,
+      'thumbnailUrl': thumbnailUrl,
       'duration': duration,
       'createdAt': createdAt,
     };
@@ -50,6 +55,7 @@ class VideoModel {
       title: json['title'] as String? ?? '',
       description: json['description'] as String? ?? '',
       videoUrl: json['videoUrl'] as String? ?? '',
+      thumbnailUrl: json['thumbnailUrl'] as String? ?? '',
       duration: json['duration'] as int? ?? 0,
       createdAt: json['createdAt'] as String? ?? '',
     );
@@ -57,7 +63,7 @@ class VideoModel {
 
   @override
   String toString() {
-    return 'VideoModel(id: $id, title: $title, videoUrl: $videoUrl, duration: $duration, createdAt: $createdAt)';
+    return 'VideoModel(id: $id, title: $title, videoUrl: $videoUrl, thumbnailUrl: $thumbnailUrl, duration: $duration, createdAt: $createdAt)';
   }
 
   @override
@@ -68,12 +74,13 @@ class VideoModel {
         other.title == title &&
         other.description == description &&
         other.videoUrl == videoUrl &&
+        other.thumbnailUrl == thumbnailUrl &&
         other.duration == duration &&
         other.createdAt == createdAt;
   }
 
   @override
   int get hashCode {
-    return Object.hash(id, title, description, videoUrl, duration, createdAt);
+    return Object.hash(id, title, description, videoUrl, thumbnailUrl, duration, createdAt);
   }
 }

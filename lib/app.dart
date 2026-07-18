@@ -15,6 +15,7 @@ import 'features/live_sessions/presentation/providers/live_sessions_provider.dar
 import 'features/gallery/presentation/providers/gallery_provider.dart';
 import 'features/videos/presentation/providers/video_provider.dart';
 import 'features/ads/presentation/providers/ad_provider.dart';
+import 'features/events/presentation/providers/event_provider.dart';
 import 'injection.dart';
 
 /// The root App widget of the My KGRA Mobile Application.
@@ -65,6 +66,9 @@ class App extends StatelessWidget {
         ),
         ChangeNotifierProvider<AdProvider>(
           create: (_) => locator<AdProvider>(),
+        ),
+        ChangeNotifierProvider<EventProvider>(
+          create: (_) => locator<EventProvider>(),
         ),
       ],
       child: MaterialApp.router(

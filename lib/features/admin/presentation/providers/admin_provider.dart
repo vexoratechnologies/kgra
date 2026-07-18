@@ -58,12 +58,22 @@ class AdminProvider extends ChangeNotifier {
   }
 
   /// Logs in administrative credentials.
-  Future<bool> loginAdmin(String username, String password) async {
+  Future<bool> loginAdmin(String username, String password, {String? allowedRole}) async {
     _setLoading(true);
     _setError(null);
     try {
       final admin = await _adminRepository.getAdminByUsername(username);
       if (admin != null && admin.password == password) {
+        if (allowedRole != null && admin.role != allowedRole) {
+          if (allowedRole == 'zonal_admin' && admin.role == 'super_admin') {
+            _setError('Access denied: Please use the Super Admin login portal.');
+          } else if (allowedRole == 'super_admin' && admin.role == 'zonal_admin') {
+            _setError('Access denied: Please use the Zonal Admin login portal.');
+          } else {
+            _setError('Access denied: Unauthorized role.');
+          }
+          return false;
+        }
         _currentAdmin = admin;
         notifyListeners();
         return true;

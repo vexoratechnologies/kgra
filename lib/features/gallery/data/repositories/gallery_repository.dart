@@ -1,6 +1,9 @@
 import 'dart:typed_data';
 import '../../../../core/services/firestore_service.dart';
 import '../../../../core/services/storage_service.dart';
+import '../../../../core/routes/app_routes.dart';
+import '../../../../core/services/push_notification_service.dart';
+import '../../../notification/data/models/notification_model.dart';
 import '../models/gallery_image_model.dart';
 
 class GalleryRepository {
@@ -25,6 +28,23 @@ class GalleryRepository {
     );
     final updatedModel = model.copyWith(imageUrl: imageUrl);
     await _firestoreService.saveGalleryImage(updatedModel);
+
+    // Save system notification
+    final notification = NotificationModel(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: 'New Gallery Image Added',
+      body: model.title,
+      routingPath: AppRoutes.gallery,
+      createdAt: DateTime.now().toIso8601String(),
+    );
+    await _firestoreService.saveNotification(notification);
+
+    // Trigger push notification broadcast
+    await PushNotificationService.instance.sendBroadcastNotification(
+      title: 'New Gallery Image Added',
+      body: model.title,
+      routingPath: AppRoutes.gallery,
+    );
   }
 
   Future<void> updateGalleryImage({

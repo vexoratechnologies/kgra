@@ -115,19 +115,29 @@ class _VideosCatalogScreenState extends State<VideosCatalogScreen> {
                                         child: Stack(
                                           alignment: Alignment.center,
                                           children: [
-                                            const Icon(Icons.video_collection, size: 36, color: AppColors.brandPrimary),
-                                            Positioned(
-                                              bottom: 4,
-                                              right: 4,
-                                              child: Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                                color: Colors.black.withValues(alpha: 0.7),
-                                                child: Text(
-                                                  '${(v.duration ~/ 60).toString().padLeft(2, '0')}:${(v.duration % 60).toString().padLeft(2, '0')}',
-                                                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                            v.thumbnailUrl.isNotEmpty
+                                                ? Image.network(
+                                                    v.thumbnailUrl,
+                                                    width: 120,
+                                                    height: 90,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (context, error, stackTrace) =>
+                                                        const Icon(Icons.video_collection, size: 36, color: AppColors.brandPrimary),
+                                                  )
+                                                : const Icon(Icons.video_collection, size: 36, color: AppColors.brandPrimary),
+                                            if (v.duration > 0)
+                                              Positioned(
+                                                bottom: 4,
+                                                right: 4,
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                                  color: Colors.black.withValues(alpha: 0.7),
+                                                  child: Text(
+                                                    '${(v.duration ~/ 60).toString().padLeft(2, '0')}:${(v.duration % 60).toString().padLeft(2, '0')}',
+                                                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                                  ),
                                                 ),
                                               ),
-                                            ),
                                           ],
                                         ),
                                       ),
@@ -160,28 +170,30 @@ class _VideosCatalogScreenState extends State<VideosCatalogScreen> {
                                                 maxLines: 2,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
-                                              const SizedBox(height: 8),
-                                              // Progress Bar
-                                              Row(
-                                                children: [
-                                                  Expanded(
-                                                    child: ClipRRect(
-                                                      borderRadius: BorderRadius.circular(2),
-                                                      child: LinearProgressIndicator(
-                                                        value: percent,
-                                                        backgroundColor: Colors.grey.shade100,
-                                                        color: isCompleted ? Colors.green : AppColors.brandPrimary,
-                                                        minHeight: 4,
+                                              if (v.duration > 0) ...[
+                                                const SizedBox(height: 8),
+                                                // Progress Bar
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: ClipRRect(
+                                                        borderRadius: BorderRadius.circular(2),
+                                                        child: LinearProgressIndicator(
+                                                          value: percent,
+                                                          backgroundColor: Colors.grey.shade100,
+                                                          color: isCompleted ? Colors.green : AppColors.brandPrimary,
+                                                          minHeight: 4,
+                                                        ),
                                                       ),
                                                     ),
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  Text(
-                                                    '${(percent * 100).toInt()}%',
-                                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
-                                                  ),
-                                                ],
-                                              ),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      '${(percent * 100).toInt()}%',
+                                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
                                             ],
                                           ),
                                         ),
