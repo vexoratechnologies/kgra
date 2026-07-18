@@ -113,7 +113,7 @@ class AppRoutes {
 
   /// Global GoRouter instance configuration
   static final GoRouter router = GoRouter(
-    initialLocation: adminSplash,
+    initialLocation: splash,
     routes: [
       GoRoute(
         path: splash,

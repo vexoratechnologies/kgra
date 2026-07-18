@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:googleapis_auth/auth_io.dart' as auth;
 import 'package:http/http.dart' as http;
+import '../constants/service_account.dart';
 import '../routes/app_routes.dart';
 
 /// PushNotificationService manages Firebase Cloud Messaging (FCM) configurations,
@@ -81,37 +83,58 @@ class PushNotificationService {
     }
   }
 
-  /// Sends a broadcast push notification to the 'kgra_notifications' topic via HTTP.
+  /// Sends a broadcast push notification to the 'kgra_notifications' topic via FCM v1 API.
   Future<void> sendBroadcastNotification({
     required String title,
     required String body,
     required String routingPath,
   }) async {
+    final client = http.Client();
     try {
-      final response = await http.post(
-        Uri.parse('https://fcm.googleapis.com/fcm/send'),
+      // 1. Load service account credentials
+      final accountCredentials = auth.ServiceAccountCredentials.fromJson(ServiceAccountConfig.credentials);
+      
+      // 2. Request FCM scopes
+      final scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
+      
+      // 3. Obtain AccessCredentials
+      final credentials = await auth.obtainAccessCredentialsViaServiceAccount(
+        accountCredentials,
+        scopes,
+        client,
+      );
+
+      final accessToken = credentials.accessToken.data;
+      debugPrint('Successfully generated OAuth2 Access Token for FCM v1.');
+
+      // 4. Send the POST request to the FCM v1 endpoint
+      final response = await client.post(
+        Uri.parse('https://fcm.googleapis.com/v1/projects/kgra-ba502/messages:send'),
         headers: <String, String>{
           'Content-Type': 'application/json',
-          'Authorization': 'key=YOUR_FCM_SERVER_KEY', // <-- REPLACE WITH YOUR ACTUAL SERVER KEY
+          'Authorization': 'Bearer $accessToken',
         },
         body: jsonEncode(
           <String, dynamic>{
-            'notification': <String, dynamic>{
-              'title': title,
-              'body': body,
+            'message': <String, dynamic>{
+              'topic': 'kgra_notifications',
+              'notification': <String, dynamic>{
+                'title': title,
+                'body': body,
+              },
+              'data': <String, dynamic>{
+                'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+                'routingPath': routingPath,
+              },
             },
-            'priority': 'high',
-            'data': <String, dynamic>{
-              'click_action': 'FLUTTER_NOTIFICATION_CLICK',
-              'routingPath': routingPath,
-            },
-            'to': '/topics/kgra_notifications',
           },
         ),
       );
-      debugPrint('FCM HTTP send response: status=${response.statusCode}, body=${response.body}');
+      debugPrint('FCM v1 send response: status=${response.statusCode}, body=${response.body}');
     } catch (e) {
-      debugPrint('Error sending FCM HTTP push notification: $e');
+      debugPrint('Error sending FCM v1 HTTP push notification: $e');
+    } finally {
+      client.close();
     }
   }
 }
