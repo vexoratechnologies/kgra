@@ -139,7 +139,10 @@ Future<void> initInjection() async {
     () => AuthProvider(authRepository: locator<AuthRepository>()),
   );
   locator.registerFactory<AdminProvider>(
-    () => AdminProvider(adminRepository: locator<AdminRepository>()),
+    () => AdminProvider(
+      adminRepository: locator<AdminRepository>(),
+      prefs: locator<SharedPreferences>(),
+    ),
   );
   locator.registerFactory<StateCommitteeProvider>(
     () => StateCommitteeProvider(repository: locator<StateCommitteeRepository>()),

@@ -124,35 +124,14 @@ class HomeScreen extends StatelessWidget {
           children: [
             // App Branding
             Text(
-              'KGRA Community',
+              'KGRA ',
               style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(
                 fontWeight: FontWeight.w700,
               ),
             ),
           ],
         ),
-        actions: [
-          // Header Notifications icon replacing the headphones/customer care icon
-          Padding(
-            padding: const EdgeInsets.only(right: AppSpacing.md),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.brandSecondary.withValues(alpha: 0.06),
-                shape: BoxShape.circle,
-              ),
-              child: IconButton(
-                icon: const Icon(
-                  LucideIcons.bell,
-                  color: AppColors.brandSecondary,
-                  size: 20,
-                ),
-                onPressed: () {
-                  context.push(AppRoutes.notification);
-                },
-              ),
-            ),
-          ),
-        ],
+
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1.0),
           child: Container(
@@ -235,7 +214,7 @@ class HomeScreen extends StatelessWidget {
               //   ),
               // ),
               
-              const SizedBox(height: AppSpacing.lg),
+              // const SizedBox(height: AppSpacing.lg),
 
               // 2. Action Grid Layout (12 Items in 3 columns)
               GridView.builder(

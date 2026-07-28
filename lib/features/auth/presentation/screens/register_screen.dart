@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,6 +9,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_style.dart';
+import '../../../../core/utils/app_snack_bar.dart';
 import '../../../admin/presentation/providers/admin_provider.dart';
 import '../providers/auth_provider.dart';
 import 'package:intl/intl.dart';
@@ -77,12 +79,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to pick image: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        AppSnackBar.showError(context, 'Failed to pick image: $e');
       }
     }
   }
@@ -113,7 +110,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final fullPhone = '+91$phone';
 
     final authProvider = context.read<AuthProvider>();
+    authProvider.clearStates();
     
+    // Check if the user is already registered
+    final exists = await authProvider.checkUserExists(fullPhone);
+    if (authProvider.error != null && mounted) {
+      AppSnackBar.showError(context, authProvider.error!);
+      return;
+    }
+    
+    if (exists && mounted) {
+      AppSnackBar.showError(context, 'This mobile number is already registered. Please log in instead.');
+      context.go(AppRoutes.login);
+      return;
+    }
+
     // Trigger OTP sending and save registration name temporarily
     final success = await authProvider.sendOtp(
       fullPhone,
@@ -131,12 +142,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       // Send them to verify OTP. Once verified, account will be created
       context.go(AppRoutes.otp);
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.error ?? 'Failed to send verification code.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppSnackBar.showError(context, authProvider.error ?? 'Failed to send verification code.');
     }
   }
 
@@ -168,50 +174,50 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   key: _formKey,
                   child: Column(
                     children: [
-                      const SizedBox(height: AppSpacing.xxl),
+                      // const SizedBox(height: AppSpacing.xxl),
                   
-                  // Small logo/brand element
-                  Center(
-                    child: Container(
-                      width: 70,
-                      height: 70,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.brandSecondary.withValues(alpha: 0.08),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.person_add_outlined,
-                          size: 36,
-                          color: AppColors.brandPrimary,
-                        ),
-                      ),
-                    ),
-                  ),
+                  // // Small logo/brand element
+                  // Center(
+                  //   child: Container(
+                  //     width: 70,
+                  //     height: 70,
+                  //     decoration: BoxDecoration(
+                  //       color: Colors.white,
+                  //       shape: BoxShape.circle,
+                  //       boxShadow: [
+                  //         BoxShadow(
+                  //           color: AppColors.brandSecondary.withValues(alpha: 0.08),
+                  //           blurRadius: 20,
+                  //           offset: const Offset(0, 8),
+                  //         ),
+                  //       ],
+                  //     ),
+                  //     child: const Center(
+                  //       child: Icon(
+                  //         Icons.person_add_outlined,
+                  //         size: 36,
+                  //         color: AppColors.brandPrimary,
+                  //       ),
+                  //     ),
+                  //   ),
+                  // ),
+                  //
+                  // const SizedBox(height: AppSpacing.md),
                   
-                  const SizedBox(height: AppSpacing.md),
-                  
-                  Text(
-                    'Create Account',
-                    style: AppTextStyle.headlineLgMobile(color: AppColors.brandSecondary).copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    'Join the Kerala Government Radiographers\' Association',
-                    style: AppTextStyle.labelSm(color: AppColors.onSurfaceVariant),
-                    textAlign: TextAlign.center,
-                  ),
-                  
-                  const SizedBox(height: AppSpacing.xl),
+                  // Text(
+                  //   'Create Account',
+                  //   style: AppTextStyle.headlineLgMobile(color: AppColors.brandSecondary).copyWith(
+                  //     fontWeight: FontWeight.w700,
+                  //   ),
+                  // ),
+                  // const SizedBox(height: AppSpacing.xs),
+                  // Text(
+                  //   'Join the Kerala Government Radiographers\' Association',
+                  //   style: AppTextStyle.labelSm(color: AppColors.onSurfaceVariant),
+                  //   textAlign: TextAlign.center,
+                  // ),
+                  //
+                  // const SizedBox(height: AppSpacing.xl),
                   
                   // Card
                   Container(
@@ -370,31 +376,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           },
                         ),
                         
-                        const SizedBox(height: AppSpacing.lg),
+                        // const SizedBox(height: AppSpacing.lg),
 
                         // Institution Label & Input
-                        Text(
-                          'Institution',
-                          style: AppTextStyle.labelMd(color: AppColors.brandSecondary).copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        TextFormField(
-                          controller: _institutionController,
-                          keyboardType: TextInputType.text,
-                          decoration: const InputDecoration(
-                            hintText: 'Enter your institution/hospital',
-                            prefixIcon: Icon(Icons.business_outlined),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Institution/Hospital is required';
-                            }
-                            return null;
-                          },
-                        ),
-                        
+                        // Text(
+                        //   'Institution',
+                        //   style: AppTextStyle.labelMd(color: AppColors.brandSecondary).copyWith(
+                        //     fontWeight: FontWeight.w600,
+                        //   ),
+                        // ),
+                        // const SizedBox(height: AppSpacing.sm),
+                        // TextFormField(
+                        //   controller: _institutionController,
+                        //   keyboardType: TextInputType.text,
+                        //   decoration: const InputDecoration(
+                        //     hintText: 'Enter your institution/hospital',
+                        //     prefixIcon: Icon(Icons.business_outlined),
+                        //   ),
+                        //   validator: (value) {
+                        //     if (value == null || value.trim().isEmpty) {
+                        //       return 'Institution/Hospital is required';
+                        //     }
+                        //     return null;
+                        //   },
+                        // ),
+                        //
                         const SizedBox(height: AppSpacing.lg),
 
                         // Zone Dropdown Selection
@@ -573,6 +579,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 child: TextFormField(
                                   controller: _phoneController,
                                   keyboardType: TextInputType.phone,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    LengthLimitingTextInputFormatter(10),
+                                  ],
                                   decoration: const InputDecoration(
                                     hintText: '10 digit number',
                                     fillColor: Colors.transparent,

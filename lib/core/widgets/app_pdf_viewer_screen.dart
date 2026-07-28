@@ -1,6 +1,8 @@
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../injection.dart';
 import '../services/storage_service.dart';
 import '../theme/app_colors.dart';
@@ -31,7 +33,25 @@ class _AppPdfViewerScreenState extends State<AppPdfViewerScreen> {
   @override
   void initState() {
     super.initState();
-    _loadPdf();
+    if (kIsWeb && !widget.pdfUrl.startsWith('mock://') && widget.pdfUrl.isNotEmpty) {
+      _launchInNewTab();
+    } else {
+      _loadPdf();
+    }
+  }
+
+  Future<void> _launchInNewTab() async {
+    final uri = Uri.parse(widget.pdfUrl);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      debugPrint('Could not launch PDF URL in new tab: $e');
+    }
+    if (mounted) {
+      Navigator.pop(context);
+    }
   }
 
   Future<void> _loadPdf() async {

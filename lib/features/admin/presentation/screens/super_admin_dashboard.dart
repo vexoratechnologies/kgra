@@ -14,9 +14,6 @@ import '../providers/admin_provider.dart';
 import '../../../ads/presentation/providers/ad_provider.dart';
 import '../../../ads/data/models/ad_model.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../injection.dart';
-import 'dart:convert';
 import 'dart:typed_data';
 
 /// SuperAdminDashboard renders the super administrative operations panel.
@@ -42,8 +39,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final currentAdmin = context.read<AdminProvider>().currentAdmin;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final adminProvider = context.read<AdminProvider>();
+      if (adminProvider.currentAdmin == null) {
+        await adminProvider.checkAdminSession();
+      }
+      final currentAdmin = adminProvider.currentAdmin;
+      if (!mounted) return;
       if (currentAdmin == null || currentAdmin.role != 'super_admin') {
         context.go(AppRoutes.superAdminLogin);
       } else {
@@ -66,7 +68,21 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     context.read<AdminProvider>().fetchZones();
     context.read<AdminProvider>().fetchDesignations();
     context.read<MeetingMinutesProvider>().fetchAllMinutes();
-    context.read<AdProvider>().fetchAds();
+    context.read<AdProvider>().fetchAds(force: true);
+  }
+
+  void _onTabChanged(String label) {
+    if (label == 'Ads Carousel') {
+      context.read<AdProvider>().fetchAds(force: true);
+    } else if (label == 'Zonal Admins') {
+      context.read<AdminProvider>().fetchAdmins();
+    } else if (label == 'Zones') {
+      context.read<AdminProvider>().fetchZones();
+    } else if (label == 'Designations') {
+      context.read<AdminProvider>().fetchDesignations();
+    } else if (label == 'Meeting Minutes') {
+      context.read<MeetingMinutesProvider>().fetchAllMinutes();
+    }
   }
 
   Future<void> _handleAddAdmin() async {
@@ -138,55 +154,45 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         .toList();
 
     return Scaffold(
-      backgroundColor: AppColors.brandBackground,
-      appBar: AppBar(
-        title: const Text('Super Admin Control Panel'),
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.brandSecondary,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _refreshData,
-            tooltip: 'Refresh Data',
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              context.read<AdminProvider>().logoutAdmin();
-              context.go(AppRoutes.superAdminLogin);
-            },
-            tooltip: 'Log Out',
-          ),
-        ],
-      ),
+      backgroundColor: AppColors.surfaceContainerLow, // Background Gutter
       body: SafeArea(
         child: Row(
           children: [
-            // Sidebar Navigation (Desktop design layout)
-            Container(
-              width: 250,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border(right: BorderSide(color: Colors.grey.shade200)),
-              ),
-              child: Column(
-                children: [
-                  const SizedBox(height: AppSpacing.lg),
-                  _buildSidebarItem('Zonal Admins', Icons.people_outline),
-                  _buildSidebarItem('Zones', Icons.map_outlined),
-                  _buildSidebarItem('Designations', Icons.badge_outlined),
-                  _buildSidebarItem('Minutes Approvals', Icons.approval_outlined),
-                  _buildSidebarItem('Ads Carousel', Icons.photo_library_outlined),
-                ],
-              ),
-            ),
+            // Fixed dark sidebar (bg-inverse-surface) on the far left.
+            _buildSidebar(context),
             
-            // Main Panel Content
+            // Background Gutter and Main Content Column
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.xl),
-                child: _buildTabContent(adminProvider, pendingMinutes),
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  children: [
+                    // Header Frame
+                    _buildHeaderFrame(context),
+                    const SizedBox(height: 16),
+                    // Main Frame
+                    Expanded(
+                      child: Container(
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceContainerLowest,
+                          borderRadius: BorderRadius.circular(24), // rounded-3xl
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.02),
+                              blurRadius: 15,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.xl),
+                          child: _buildTabContent(adminProvider, pendingMinutes),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -195,20 +201,235 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     );
   }
 
-  Widget _buildSidebarItem(String label, IconData icon) {
-    final isSelected = _activeTab == label;
-    return ListTile(
-      leading: Icon(icon, color: isSelected ? AppColors.brandPrimary : AppColors.brandSecondary),
-      title: Text(
-        label,
-        style: TextStyle(
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          color: isSelected ? AppColors.brandPrimary : AppColors.onSurface,
+  Widget _buildHeaderFrame(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            _activeTab,
+            style: AppTextStyle.headlineLg(color: AppColors.brandSecondary).copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          Row(
+            children: [
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brandPrimary.withValues(alpha: 0.08),
+                  foregroundColor: AppColors.brandPrimary,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 10),
+                ),
+                onPressed: _refreshData,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('Refresh Data'),
+              ),
+              const SizedBox(width: AppSpacing.lg),
+              const VerticalDivider(width: 1, indent: 8, endIndent: 8),
+              const SizedBox(width: AppSpacing.lg),
+              const CircleAvatar(
+                radius: 18,
+                backgroundColor: AppColors.brandPrimary,
+                child: Icon(Icons.security, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                'Super Admin',
+                style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSidebar(BuildContext context) {
+    return Container(
+      width: 220, // Slimmer profile
+      height: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLow, // Soft background
+        border: Border(
+          right: BorderSide(
+            color: AppColors.brandSecondary.withValues(alpha: 0.08),
+            width: 1.5,
+          ),
         ),
       ),
-      selected: isSelected,
-      selectedTileColor: AppColors.brandPrimary.withValues(alpha: 0.05),
-      onTap: () => setState(() => _activeTab = label),
+      child: Column(
+        children: [
+          // Logo Section (Top-aligned)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: AppColors.brandSecondary.withValues(alpha: 0.04),
+                  width: 1,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: AppRadius.borderMd,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: AppRadius.borderMd,
+                    child: Image.asset(
+                      'assets/icon/kgra.jpeg',
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'My KGRA',
+                      style: TextStyle(
+                        fontFamily: 'Manrope',
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                        color: AppColors.brandSecondary,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    Text(
+                      'Super Admin',
+                      style: TextStyle(
+                        fontFamily: 'Manrope',
+                        fontSize: 9,
+                        color: AppColors.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+
+          // Menu Items
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              children: [
+                _buildSidebarItem('Zonal Admins', Icons.people_outline),
+                _buildSidebarItem('Zones', Icons.map_outlined),
+                _buildSidebarItem('Designations', Icons.badge_outlined),
+                _buildSidebarItem('Minutes Approvals', Icons.approval_outlined),
+                _buildSidebarItem('Ads Carousel', Icons.photo_library_outlined),
+              ],
+            ),
+          ),
+
+          // Footer Back Button / Log Out
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(45),
+                side: BorderSide(color: AppColors.brandSecondary.withValues(alpha: 0.15)),
+                foregroundColor: AppColors.brandSecondary,
+                shape: RoundedRectangleBorder(borderRadius: AppRadius.borderMd),
+              ),
+              onPressed: () {
+                context.read<AdminProvider>().logoutAdmin();
+                context.go(AppRoutes.superAdminLogin);
+              },
+              icon: const Icon(Icons.logout, size: 16),
+              label: const Text('Log Out'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSidebarItem(String label, IconData icon) {
+    final isSelected = _activeTab == label;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: InkWell(
+            onTap: () {
+              setState(() => _activeTab = label);
+              _onTabChanged(label);
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              // Generous vertical padding: py-4 (14px-16px vertical padding)
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.brandPrimary.withValues(alpha: 0.05)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    icon,
+                    color: isSelected ? const Color(0xFF8B1E2D) : const Color(0xFF64748B),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontFamily: 'Manrope',
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                        color: isSelected ? const Color(0xFF8B1E2D) : const Color(0xFF64748B),
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (isSelected)
+          Positioned(
+            left: -8, // Center-align pill relative to the left margin
+            top: 10,
+            bottom: 16,
+            child: Container(
+              width: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFF8B1E2D),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -378,7 +599,15 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   TextFormField(
                     controller: _zoneNameController,
                     decoration: const InputDecoration(hintText: 'e.g. North Zone'),
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Zone name required' : null,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) {
+                        return 'Zone name required';
+                      }
+                      if (!RegExp(r'^[a-zA-Z\s]+$').hasMatch(v.trim())) {
+                        return 'Zone name must contain alphabets only';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   
@@ -568,21 +797,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                                   child: Stack(
                                     fit: StackFit.expand,
                                     children: [
-                                      ad.imageUrl.startsWith('mock://')
-                                          ? Image.memory(
-                                              base64Decode(
-                                                locator<SharedPreferences>().getString('mock_storage_ads_${ad.id}') ?? ''
-                                              ),
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (context, error, stackTrace) {
-                                                return const Icon(Icons.broken_image);
-                                              },
-                                            )
-                                          : Image.network(
-                                              ad.imageUrl,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image),
-                                            ),
+                                      Image.network(
+                                        ad.imageUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image),
+                                      ),
                                       Positioned(
                                         top: 4,
                                         right: 4,
@@ -643,9 +862,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
   void _showAdDialog(BuildContext context, {AdModel? ad}) {
     final formKey = GlobalKey<FormState>();
-    final urlCtrl = TextEditingController(text: ad?.targetUrl ?? '');
     Uint8List? imageBytes;
     String? originalFileName;
+    bool isSaving = false;
 
     showDialog(
       context: context,
@@ -661,7 +880,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       GestureDetector(
-                        onTap: () async {
+                        onTap: isSaving ? null : () async {
                           final picker = ImagePicker();
                           final img = await picker.pickImage(
                             source: ImageSource.gallery,
@@ -693,12 +912,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                               : (ad != null
                                   ? ClipRRect(
                                       borderRadius: AppRadius.borderMd,
-                                      child: ad.imageUrl.startsWith('mock://')
-                                          ? Image.memory(
-                                              base64Decode(locator<SharedPreferences>().getString('mock_storage_ads_${ad.id}') ?? ''),
-                                              fit: BoxFit.cover,
-                                            )
-                                          : Image.network(ad.imageUrl, fit: BoxFit.cover),
+                                      child: Image.network(
+                                        ad.imageUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image),
+                                      ),
                                     )
                                   : const Column(
                                       mainAxisAlignment: MainAxisAlignment.center,
@@ -714,48 +932,67 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                         const SizedBox(height: 8),
                         Text('Selected: $originalFileName', style: const TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.bold)),
                       ],
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: urlCtrl,
-                        decoration: const InputDecoration(labelText: 'Target URL (Optional)'),
-                      ),
                     ],
                   ),
                 ),
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(dialogCtx),
+                  onPressed: isSaving ? null : () => Navigator.pop(dialogCtx),
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: () async {
-                    if (formKey.currentState!.validate()) {
-                      if (ad == null && imageBytes == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Please select an image.')),
-                        );
-                        return;
-                      }
-                      final newAd = AdModel(
-                        id: ad?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-                        imageUrl: ad?.imageUrl ?? '',
-                        targetUrl: urlCtrl.text.trim().isEmpty ? null : urlCtrl.text.trim(),
-                        createdAt: ad?.createdAt ?? DateTime.now().toIso8601String(),
-                      );
-                      bool success;
-                      if (ad == null) {
-                        success = await context.read<AdProvider>().addAd(newAd, imageBytes!);
-                      } else {
-                        success = await context.read<AdProvider>().updateAd(newAd, imageBytes);
-                      }
-                      if (success && dialogCtx.mounted) {
-                        Navigator.pop(dialogCtx);
-                        _refreshData();
-                      }
-                    }
-                  },
-                  child: const Text('Save'),
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          if (formKey.currentState!.validate()) {
+                            if (ad == null && imageBytes == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please select an image.')),
+                              );
+                              return;
+                            }
+                            setDialogState(() {
+                              isSaving = true;
+                            });
+                            
+                            final newAd = AdModel(
+                              id: ad?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                              imageUrl: ad?.imageUrl ?? '',
+                              targetUrl: null, // Target URL removed
+                              createdAt: ad?.createdAt ?? DateTime.now().toIso8601String(),
+                            );
+
+                            final adProvider = context.read<AdProvider>();
+                            bool success;
+                            if (ad == null) {
+                              success = await adProvider.addAd(newAd, imageBytes!);
+                            } else {
+                              success = await adProvider.updateAd(newAd, imageBytes);
+                            }
+                            
+                            if (success && dialogCtx.mounted) {
+                              Navigator.pop(dialogCtx);
+                              _refreshData();
+                            } else {
+                              if (dialogCtx.mounted) {
+                                ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                                  SnackBar(content: Text(adProvider.error ?? 'Failed to save ad banner.')),
+                                );
+                              }
+                              setDialogState(() {
+                                isSaving = false;
+                              });
+                            }
+                          }
+                        },
+                  child: isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Save'),
                 ),
               ],
             );

@@ -1,12 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
-import '../../../../injection.dart';
+import '../../data/models/ad_model.dart';
 import '../providers/ad_provider.dart';
 
 class AdCarouselWidget extends StatefulWidget {
@@ -25,17 +23,23 @@ class _AdCarouselWidgetState extends State<AdCarouselWidget> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AdProvider>().fetchAds().then((_) {
-        _startAutoScroll();
+      if (!mounted) return;
+      final provider = context.read<AdProvider>();
+      provider.fetchAds().then((_) {
+        if (!mounted) return;
+        _startAutoScroll(provider.adsList);
       });
     });
   }
 
-  void _startAutoScroll() {
-    final ads = context.read<AdProvider>().adsList;
+  void _startAutoScroll(List<AdModel> ads) {
     if (ads.length > 1) {
       _timer?.cancel();
       _timer = Timer.periodic(const Duration(seconds: 4), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
         if (_pageController.hasClients) {
           final nextPage = (_currentPage + 1) % ads.length;
           _pageController.animateToPage(
@@ -49,16 +53,6 @@ class _AdCarouselWidgetState extends State<AdCarouselWidget> {
   }
 
   Widget _buildAdImage(String imageUrl, String docId) {
-    if (imageUrl.startsWith('mock://')) {
-      final base64String = locator<SharedPreferences>().getString('mock_storage_ads_$docId');
-      if (base64String != null && base64String.isNotEmpty) {
-        return Image.memory(
-          base64Decode(base64String),
-          fit: BoxFit.cover,
-        );
-      }
-      return const Center(child: Icon(Icons.broken_image, color: Colors.grey));
-    }
     return Image.network(
       imageUrl,
       fit: BoxFit.cover,

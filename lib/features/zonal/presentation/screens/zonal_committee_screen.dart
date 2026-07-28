@@ -45,13 +45,13 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
     
     final zones = adminProvider.zones;
     
-    // Automatically select the first zone if not selected yet
-    if (_selectedZone == null && zones.isNotEmpty) {
-      _selectedZone = zones.first;
+    // Automatically select 'All' if not selected yet
+    if (_selectedZone == null) {
+      _selectedZone = 'All';
     }
 
     final filteredMembers = zonalProvider.members.where((m) {
-      final matchesZone = m.zone == _selectedZone;
+      final matchesZone = _selectedZone == 'All' || m.zone == _selectedZone;
       final matchesQuery = m.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           m.designation.toLowerCase().contains(_searchQuery.toLowerCase());
       return matchesZone && matchesQuery;
@@ -96,7 +96,7 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
                       decoration: const InputDecoration(
                         contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
-                      items: zones.map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
+                      items: ['All', ...zones].map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
                       onChanged: (val) => setState(() => _selectedZone = val),
                     ),
                   ),
@@ -112,7 +112,7 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
                 controller: _searchController,
                 onChanged: (v) => setState(() => _searchQuery = v),
                 decoration: InputDecoration(
-                  hintText: 'Search members in this zone...',
+                  hintText: _selectedZone == 'All' ? 'Search all members...' : 'Search members in this zone...',
                   prefixIcon: const Icon(Icons.search),
                   filled: true,
                   fillColor: AppColors.brandSecondary.withValues(alpha: 0.03),
@@ -137,7 +137,9 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
                                   Icon(Icons.people_outline, size: 64, color: Colors.grey.shade400),
                                   const SizedBox(height: 16),
                                   Text(
-                                    _searchQuery.isNotEmpty ? 'No members match search' : 'No committee members in this zone',
+                                    _searchQuery.isNotEmpty 
+                                        ? 'No members match search' 
+                                        : (_selectedZone == 'All' ? 'No committee members found' : 'No committee members in this zone'),
                                     style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
                                   ),
                                 ],

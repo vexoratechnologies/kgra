@@ -59,7 +59,7 @@ class AuthRepository {
   /// 
   /// Returns the [UserModel] if registered, or null if registration is needed.
   Future<UserModel?> verifyOtp(String phoneNumber, String code) async {
-    final firebaseUser = await _authService.verifyOtp(phoneNumber, code);
+    await _authService.verifyOtp(phoneNumber, code);
     
     // Check if the user document exists in Firestore
     final userModel = await _firestoreService.getUserByPhoneNumber(phoneNumber);
@@ -67,17 +67,8 @@ class AuthRepository {
       return null; // Phone verified, but registration details are missing
     }
 
-    // Update UID if it differs (e.g. anonymous sign-in UID changed)
-    UserModel finalUser = userModel;
-    if (userModel.uid != firebaseUser.uid) {
-      final oldUid = userModel.uid;
-      finalUser = userModel.copyWith(uid: firebaseUser.uid);
-      await _firestoreService.saveUser(finalUser);
-      await _firestoreService.deleteUser(oldUid); // Clean up duplicate/old UID doc
-    }
-
-    await cacheUser(finalUser);
-    return finalUser;
+    await cacheUser(userModel);
+    return userModel;
   }
 
   /// Registers a new user request in Firestore.
@@ -104,7 +95,16 @@ class AuthRepository {
     if (firebaseUser == null) {
       return null;
     }
-    final user = await _firestoreService.getUserByUid(firebaseUser.uid);
+    
+    UserModel? user;
+    // Look up by verified phone number if available
+    if (firebaseUser.phoneNumber != null && firebaseUser.phoneNumber!.isNotEmpty) {
+      user = await _firestoreService.getUserByPhoneNumber(firebaseUser.phoneNumber!);
+    }
+    
+    // Fallback to direct UID document lookup
+    user ??= await _firestoreService.getUserByUid(firebaseUser.uid);
+
     if (user != null) {
       await cacheUser(user);
     }

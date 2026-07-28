@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/routes/app_routes.dart';
@@ -6,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_style.dart';
+import '../../../../core/utils/app_snack_bar.dart';
 import '../providers/auth_provider.dart';
 
 /// LoginScreen implements mockup 1 (Member Login page).
@@ -45,23 +47,13 @@ class _LoginScreenState extends State<LoginScreen> {
     final exists = await authProvider.checkUserExists(fullPhoneNumber);
     
     if (authProvider.error != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.error!),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppSnackBar.showError(context, authProvider.error!);
       return;
     }
     
     if (!exists && mounted) {
       authProvider.setVerificationPhone(fullPhoneNumber);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Mobile number not registered. Please create an account.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppSnackBar.showError(context, 'Mobile number not registered. Please create an account.');
       context.go(AppRoutes.register);
       return;
     }
@@ -72,12 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (success && mounted) {
       context.go(AppRoutes.otp);
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.error ?? 'Authentication failed.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppSnackBar.showError(context, authProvider.error ?? 'Authentication failed.');
     }
   }
 
@@ -110,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   key: _formKey,
                   child: Column(
                     children: [
-                      const SizedBox(height: AppSpacing.xxl),
+                      // const SizedBox(height: AppSpacing.xxl),
                   
                   // Watermark / Brand Logo at top
                   Center(
@@ -128,11 +115,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.healing_outlined, // caduceus mockup icon
-                          size: 40,
-                          color: AppColors.brandPrimary,
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/icon/kgra.jpeg',
+                          fit: BoxFit.cover,
                         ),
                       ),
                     ),
@@ -236,6 +222,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                 child: TextFormField(
                                   controller: _phoneController,
                                   keyboardType: TextInputType.phone,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    LengthLimitingTextInputFormatter(10),
+                                  ],
                                   decoration: const InputDecoration(
                                     hintText: 'Enter 10 digit number',
                                     fillColor: Colors.transparent,

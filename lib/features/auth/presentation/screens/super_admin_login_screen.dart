@@ -5,6 +5,8 @@ import '../../../../core/routes/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_text_style.dart';
+import '../../../../core/utils/app_snack_bar.dart';
 import '../../../admin/presentation/providers/admin_provider.dart';
 
 /// SuperAdminLoginScreen renders a premium, high-security login console for the Super Administrator.
@@ -43,38 +45,35 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
     if (success && mounted) {
       context.go(AppRoutes.superAdminDashboard);
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(adminProvider.error ?? 'Super Admin Authentication failed.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppSnackBar.showError(context, adminProvider.error ?? 'Super Admin Authentication failed.');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final adminProvider = context.watch<AdminProvider>();
-    const goldColor = Color(0xFFFFD700);
 
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF1E0004), Color(0xFF3F0008)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+          color: AppColors.brandBackground,
+          image: DecorationImage(
+            image: NetworkImage(
+              'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&q=80&w=1000'
+            ),
+            opacity: 0.03, // translucent background watermark
+            fit: BoxFit.cover,
           ),
         ),
         child: SafeArea(
           child: Stack(
             children: [
-              // Custom AppBar leading for dark background
+              // Custom AppBar leading matching brand primary
               Positioned(
                 top: 0,
                 left: 0,
                 child: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: goldColor),
+                  icon: const Icon(Icons.arrow_back, color: AppColors.brandPrimary),
                   onPressed: () => context.go(AppRoutes.login),
                 ),
               ),
@@ -88,28 +87,27 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // Gold Shield Icon
+                          // Brand circular logo
                           Center(
                             child: Container(
                               width: 80,
                               height: 80,
                               decoration: BoxDecoration(
-                                color: goldColor.withValues(alpha: 0.1),
+                                color: Colors.white,
                                 shape: BoxShape.circle,
-                                border: Border.all(color: goldColor, width: 1.5),
+                                border: Border.all(color: AppColors.brandPrimary.withValues(alpha: 0.2), width: 1.5),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: goldColor.withValues(alpha: 0.2),
+                                    color: AppColors.brandSecondary.withValues(alpha: 0.08),
                                     blurRadius: 20,
                                     offset: const Offset(0, 8),
                                   ),
                                 ],
                               ),
-                              child: const Center(
-                                child: Icon(
-                                  Icons.security_outlined,
-                                  size: 40,
-                                  color: goldColor,
+                              child: ClipOval(
+                                child: Image.asset(
+                                  'assets/icon/kgra.jpeg',
+                                  fit: BoxFit.cover,
                                 ),
                               ),
                             ),
@@ -120,7 +118,7 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                             'KGRA SUPER ADMIN',
                             style: TextStyle(
                               fontSize: 22,
-                              color: goldColor,
+                              color: AppColors.brandPrimary,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 2.0,
                             ),
@@ -130,7 +128,7 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                             'Central Command & Control System',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.white70,
+                              color: AppColors.onSurfaceVariant,
                               fontWeight: FontWeight.w500,
                             ),
                             textAlign: TextAlign.center,
@@ -143,15 +141,15 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                             width: double.infinity,
                             padding: const EdgeInsets.all(AppSpacing.lg),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.08),
+                              color: Colors.white.withValues(alpha: 0.90),
                               borderRadius: AppRadius.borderXl,
                               border: Border.all(
-                                color: goldColor.withValues(alpha: 0.15),
+                                color: AppColors.brandSecondary.withValues(alpha: 0.08),
                                 width: 1.0,
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.3),
+                                  color: AppColors.brandSecondary.withValues(alpha: 0.05),
                                   blurRadius: 30,
                                   offset: const Offset(0, 15),
                                 ),
@@ -160,29 +158,22 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Secure Console Sign In',
-                                  style: TextStyle(
-                                    color: goldColor,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: AppSpacing.xs),
-                                const Text(
-                                  'Authentication required for root access',
-                                  style: TextStyle(
-                                    color: Colors.white54,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                const SizedBox(height: AppSpacing.lg),
+
+                                // // const SizedBox(height: AppSpacing.xs),
+                                // const Text(
+                                //   'Authentication required for root access',
+                                //   style: TextStyle(
+                                //     color: AppColors.onSurfaceVariant,
+                                //     fontSize: 13,
+                                //   ),
+                                // ),
+                                // const SizedBox(height: AppSpacing.lg),
 
                                 // Username Field
                                 const Text(
                                   'Master Username',
                                   style: TextStyle(
-                                    color: goldColor,
+                                    color: AppColors.brandSecondary,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -190,29 +181,9 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                                 const SizedBox(height: AppSpacing.sm),
                                 TextFormField(
                                   controller: _usernameController,
-                                  style: const TextStyle(color: Colors.white),
-                                  decoration: InputDecoration(
-                                    filled: true,
-                                    fillColor: Colors.white.withValues(alpha: 0.1),
+                                  decoration: const InputDecoration(
                                     hintText: 'Enter username',
-                                    hintStyle: const TextStyle(color: Colors.white30),
-                                    prefixIcon: const Icon(Icons.person_outline, color: goldColor),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: AppRadius.borderMd,
-                                      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: AppRadius.borderMd,
-                                      borderSide: const BorderSide(color: goldColor, width: 1.5),
-                                    ),
-                                    errorBorder: OutlineInputBorder(
-                                      borderRadius: AppRadius.borderMd,
-                                      borderSide: const BorderSide(color: AppColors.error),
-                                    ),
-                                    focusedErrorBorder: OutlineInputBorder(
-                                      borderRadius: AppRadius.borderMd,
-                                      borderSide: const BorderSide(color: AppColors.error, width: 1.5),
-                                    ),
+                                    prefixIcon: Icon(Icons.person_outline),
                                   ),
                                   validator: (value) {
                                     if (value == null || value.trim().isEmpty) {
@@ -227,7 +198,7 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                                 const Text(
                                   'Console Password',
                                   style: TextStyle(
-                                    color: goldColor,
+                                    color: AppColors.brandSecondary,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -236,29 +207,9 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                                 TextFormField(
                                   controller: _passwordController,
                                   obscureText: true,
-                                  style: const TextStyle(color: Colors.white),
-                                  decoration: InputDecoration(
-                                    filled: true,
-                                    fillColor: Colors.white.withValues(alpha: 0.1),
+                                  decoration: const InputDecoration(
                                     hintText: 'Enter password',
-                                    hintStyle: const TextStyle(color: Colors.white30),
-                                    prefixIcon: const Icon(Icons.lock_outline, color: goldColor),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: AppRadius.borderMd,
-                                      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: AppRadius.borderMd,
-                                      borderSide: const BorderSide(color: goldColor, width: 1.5),
-                                    ),
-                                    errorBorder: OutlineInputBorder(
-                                      borderRadius: AppRadius.borderMd,
-                                      borderSide: const BorderSide(color: AppColors.error),
-                                    ),
-                                    focusedErrorBorder: OutlineInputBorder(
-                                      borderRadius: AppRadius.borderMd,
-                                      borderSide: const BorderSide(color: AppColors.error, width: 1.5),
-                                    ),
+                                    prefixIcon: Icon(Icons.lock_outline),
                                   ),
                                   validator: (value) {
                                     if (value == null || value.trim().isEmpty) {
@@ -274,23 +225,17 @@ class _SuperAdminLoginScreenState extends State<SuperAdminLoginScreen> {
                                   width: double.infinity,
                                   height: 48,
                                   child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: goldColor,
-                                      foregroundColor: const Color(0xFF1E0004),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: AppRadius.borderMd,
-                                      ),
-                                    ),
                                     onPressed: adminProvider.isLoading ? null : _handleLogin,
                                     child: adminProvider.isLoading
-                                        ? const CircularProgressIndicator(color: Color(0xFF1E0004))
-                                        : const Text(
-                                            'Authorize Session',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.bold,
+                                        ? const SizedBox(
+                                            width: 24,
+                                            height: 24,
+                                            child: CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 2,
                                             ),
-                                          ),
+                                          )
+                                        : const Text('Authorize Session'),
                                   ),
                                 ),
                               ],

@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_style.dart';
+import '../../../../core/utils/app_snack_bar.dart';
 import '../../../admin/presentation/providers/admin_provider.dart';
 
 /// AdminLoginScreen renders the administrator login form.
@@ -44,12 +45,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     if (success && mounted) {
       context.go(AppRoutes.adminUsers);
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(adminProvider.error ?? 'Authentication failed.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppSnackBar.showError(context, adminProvider.error ?? 'Authentication failed.');
     }
   }
 
@@ -59,14 +55,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.brandBackground,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.brandSecondary),
-          onPressed: () => context.go(AppRoutes.login),
-        ),
-      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -94,11 +82,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                             ),
                           ],
                         ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.admin_panel_settings_outlined,
-                            size: 40,
-                            color: AppColors.brandPrimary,
+                        child: ClipOval(
+                          child: Image.asset(
+                            'assets/icon/kgra.jpeg',
+                            fit: BoxFit.cover,
                           ),
                         ),
                       ),

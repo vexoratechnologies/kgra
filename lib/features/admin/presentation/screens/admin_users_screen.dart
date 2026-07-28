@@ -35,8 +35,7 @@ import '../../../../features/events/presentation/providers/event_provider.dart';
 import '../../../../features/events/data/models/event_model.dart';
 import '../providers/admin_provider.dart';
 import '../../../notification/presentation/providers/notification_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../injection.dart';
+
 
 /// AdminUsersScreen lists pending registration requests and supports approved/rejected tabs.
 class AdminUsersScreen extends StatefulWidget {
@@ -60,10 +59,15 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final currentAdmin = context.read<AdminProvider>().currentAdmin;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final adminProvider = context.read<AdminProvider>();
+      if (adminProvider.currentAdmin == null) {
+        await adminProvider.checkAdminSession();
+      }
+      final currentAdmin = adminProvider.currentAdmin;
+      if (!mounted) return;
       if (currentAdmin == null || currentAdmin.role != 'zonal_admin') {
-        context.read<AdminProvider>().logoutAdmin();
+        adminProvider.logoutAdmin();
         context.go(AppRoutes.adminLogin);
       } else {
         _refreshAllData();
@@ -96,6 +100,34 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     context.read<GalleryProvider>().fetchImages();
     context.read<VideoProvider>().fetchVideos();
     context.read<EventProvider>().fetchEvents();
+  }
+
+  void _onTabChanged(String label) {
+    if (label == 'Dashboard') {
+      _refreshAllData();
+    } else if (label == 'Pending Approvals') {
+      context.read<AdminProvider>().fetchPendingUsers();
+    } else if (label == 'Approved Members') {
+      context.read<AdminProvider>().fetchApprovedUsers();
+    } else if (label == 'Rejected Requests') {
+      context.read<AdminProvider>().fetchRejectedUsers();
+    } else if (label == 'Zonal Committee') {
+      context.read<ZonalProvider>().fetchMembers();
+    } else if (label == 'Meeting Minutes') {
+      context.read<MeetingMinutesProvider>().fetchAllMinutes();
+    } else if (label == 'Govt Orders') {
+      context.read<GovernmentOrdersProvider>().fetchAllOrders();
+    } else if (label == 'Forms & Circulars') {
+      context.read<FormsCircularsProvider>().fetchAllForms();
+    } else if (label == 'Updates') {
+      context.read<UpdatesProvider>().fetchUpdates();
+    } else if (label == 'Gallery') {
+      context.read<GalleryProvider>().fetchImages();
+    } else if (label == 'Videos') {
+      context.read<VideoProvider>().fetchVideos();
+    } else if (label == 'Events') {
+      context.read<EventProvider>().fetchEvents();
+    }
   }
 
   void _toggleExpand(UserModel user, AdminProvider provider) {
@@ -168,21 +200,48 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        color: AppColors.brandBackground,
+        color: isDesktop ? AppColors.surfaceContainerLow : AppColors.brandBackground,
         child: SafeArea(
           child: Row(
             children: [
               if (isDesktop) _buildSidebar(context, isMobile: false),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (isDesktop) _buildTopBar(context),
-                    Expanded(
-                      child: _buildMainContent(context),
-                    ),
-                  ],
-                ),
+                child: isDesktop
+                    ? Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildTopBar(context),
+                            const SizedBox(height: 16),
+                            Expanded(
+                              child: Container(
+                                clipBehavior: Clip.antiAlias,
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceContainerLowest,
+                                  borderRadius: BorderRadius.circular(24), // rounded-3xl
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.02),
+                                      blurRadius: 15,
+                                      offset: const Offset(0, 8),
+                                    ),
+                                  ],
+                                ),
+                                child: _buildMainContent(context),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _buildMainContent(context),
+                          ),
+                        ],
+                      ),
               ),
             ],
           ),
@@ -192,11 +251,20 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   }
 
   Widget _buildTopBar(BuildContext context) {
+    final isDesktop = MediaQuery.of(context).size.width >= 850;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.md),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: isDesktop ? BorderRadius.circular(20) : null,
+        boxShadow: isDesktop ? [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ] : null,
+        border: isDesktop ? null : Border(
           bottom: BorderSide(
             color: AppColors.brandSecondary.withValues(alpha: 0.06),
             width: 1,
@@ -253,22 +321,22 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final pendingCount = adminProvider.pendingUsers.length;
 
     final sidebarContent = Container(
-      width: 260,
+      width: isMobile ? 260 : 220, // Slimmer profile
       height: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isMobile ? Colors.white : AppColors.surfaceContainerLow, // Soft background
         border: Border(
           right: BorderSide(
-            color: AppColors.brandSecondary.withValues(alpha: 0.06),
-            width: 1,
+            color: AppColors.brandSecondary.withValues(alpha: 0.08),
+            width: 1.5,
           ),
         ),
       ),
       child: Column(
         children: [
-          // Logo Section
+          // Logo Section (Top-aligned)
           Container(
-            padding: const EdgeInsets.all(AppSpacing.xl),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
             decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(
@@ -280,22 +348,30 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
-                    color: AppColors.brandPrimary.withValues(alpha: 0.08),
+                    color: Colors.white,
                     borderRadius: AppRadius.borderMd,
                   ),
-                  child: const Icon(Icons.healing_outlined, color: AppColors.brandPrimary, size: 24),
+                  child: ClipRRect(
+                    borderRadius: AppRadius.borderMd,
+                    child: Image.asset(
+                      'assets/icon/kgra.jpeg',
+                      fit: BoxFit.cover,
+                    ),
+                  ),
                 ),
-                const SizedBox(width: AppSpacing.md),
+                const SizedBox(width: AppSpacing.sm),
                 const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'My KGRA',
                       style: TextStyle(
+                        fontFamily: 'Manrope',
                         fontWeight: FontWeight.w900,
-                        fontSize: 16,
+                        fontSize: 15,
                         color: AppColors.brandSecondary,
                         letterSpacing: 0.5,
                       ),
@@ -303,7 +379,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                     Text(
                       'Admin Dashboard',
                       style: TextStyle(
-                        fontSize: 10,
+                        fontFamily: 'Manrope',
+                        fontSize: 9,
                         color: AppColors.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
                       ),
@@ -420,65 +497,88 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   }) {
     final isSelected = _activeTab == label;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: InkWell(
-        onTap: () {
-          setState(() {
-            _activeTab = label;
-            _expandedUserUid = null;
-            _searchQuery = '';
-            _searchController.clear();
-          });
-          if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
-            _scaffoldKey.currentState?.closeDrawer();
-          }
-        },
-        borderRadius: AppRadius.borderMd,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.brandPrimary.withValues(alpha: 0.08) : Colors.transparent,
-            borderRadius: AppRadius.borderMd,
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                color: isSelected ? AppColors.brandPrimary : AppColors.onSurfaceVariant,
-                size: 20,
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: InkWell(
+            onTap: () {
+              setState(() {
+                _activeTab = label;
+                _expandedUserUid = null;
+                _searchQuery = '';
+                _searchController.clear();
+              });
+              _onTabChanged(label);
+              if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
+                _scaffoldKey.currentState?.closeDrawer();
+              }
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              // Generous vertical padding: py-4 (14px-16px vertical padding)
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.brandPrimary.withValues(alpha: 0.05)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
               ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: isSelected ? AppColors.brandPrimary : AppColors.brandSecondary,
-                    fontSize: 13.5,
+              child: Row(
+                children: [
+                  Icon(
+                    icon,
+                    color: isSelected ? const Color(0xFF8B1E2D) : const Color(0xFF64748B),
+                    size: 20,
                   ),
-                ),
-              ),
-              if (badgeCount != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                  decoration: BoxDecoration(
-                    color: label == 'Pending Approvals' ? AppColors.error : AppColors.brandPrimary,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    badgeCount.toString(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontFamily: 'Manrope',
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                        color: isSelected ? const Color(0xFF8B1E2D) : const Color(0xFF64748B),
+                        fontSize: 14,
+                      ),
                     ),
                   ),
-                ),
-            ],
+                  if (badgeCount != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                      decoration: BoxDecoration(
+                        color: label == 'Pending Approvals' ? AppColors.error : AppColors.brandPrimary,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        badgeCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
-      ),
+        if (isSelected)
+          Positioned(
+            left: -8, // Center-align pill relative to the left margin
+            top: 10,
+            bottom: 16,
+            child: Container(
+              width: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFF8B1E2D),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -530,13 +630,13 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       padding: const EdgeInsets.all(AppSpacing.xl),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1000),
+          constraints: const BoxConstraints(maxWidth: 1200),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Welcome Cards
               Text(
-                'Welcome, Administrator',
+                'Welcome, ',
                 style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -601,6 +701,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         icon: Icons.pending_actions_outlined,
                         color: AppColors.error,
                         width: count == 2 ? (constraints.maxWidth - AppSpacing.lg) / 2 : cardWidth,
+                        onTap: () {
+                          setState(() {
+                            _activeTab = 'Pending Approvals';
+                          });
+                        },
                       ),
                       _buildStatCard(
                         title: 'Approved Members',
@@ -608,6 +713,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         icon: Icons.check_circle_outline,
                         color: Colors.green,
                         width: count == 2 ? (constraints.maxWidth - AppSpacing.lg) / 2 : cardWidth,
+                        onTap: () {
+                          setState(() {
+                            _activeTab = 'Approved Members';
+                          });
+                        },
                       ),
                       _buildStatCard(
                         title: 'Rejected Requests',
@@ -615,6 +725,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         icon: Icons.cancel_outlined,
                         color: Colors.grey,
                         width: count == 2 ? (constraints.maxWidth - AppSpacing.lg) / 2 : cardWidth,
+                        onTap: () {
+                          setState(() {
+                            _activeTab = 'Rejected Requests';
+                          });
+                        },
                       ),
                     ],
                   );
@@ -713,48 +828,57 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     required IconData icon,
     required Color color,
     required double width,
+    VoidCallback? onTap,
   }) {
+    final cardContent = Padding(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.08),
+              borderRadius: AppRadius.borderMd,
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.onSurfaceVariant,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: AppTextStyle.headlineLg(color: AppColors.brandSecondary).copyWith(
+                    fontWeight: FontWeight.bold,
+                    height: 1.1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
     return _buildCardWrapper(
       width: width,
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.08),
-                borderRadius: AppRadius.borderMd,
-              ),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: AppColors.onSurfaceVariant,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    value,
-                    style: AppTextStyle.headlineLg(color: AppColors.brandSecondary).copyWith(
-                      fontWeight: FontWeight.bold,
-                      height: 1.1,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+      child: onTap != null
+          ? InkWell(
+              borderRadius: AppRadius.borderLg,
+              onTap: onTap,
+              child: cardContent,
+            )
+          : cardContent,
     );
   }
 
@@ -862,7 +986,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
           ),
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 800),
+              constraints: const BoxConstraints(maxWidth: 1200),
               child: TextField(
                 controller: _searchController,
                 onChanged: (val) => setState(() => _searchQuery = val),
@@ -980,7 +1104,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                     )
                   : Center(
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 800),
+                        constraints: const BoxConstraints(maxWidth: 1200),
                         child: ListView.builder(
                           padding: const EdgeInsets.all(AppSpacing.xl),
                           itemCount: filteredUsers.length,
@@ -1254,7 +1378,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       padding: const EdgeInsets.all(AppSpacing.xl),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
+          constraints: const BoxConstraints(maxWidth: 1200),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1745,6 +1869,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     showDialog(
       context: context,
       builder: (dialogCtx) {
+        bool isSaving = false;
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
@@ -1784,7 +1909,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () async {
+                            onPressed: isSaving ? null : () async {
                               final result = await FilePicker.platform.pickFiles(
                                 type: FileType.custom,
                                 allowedExtensions: ['pdf'],
@@ -1812,11 +1937,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(dialogCtx),
+                  onPressed: isSaving ? null : () => Navigator.pop(dialogCtx),
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: () async {
+                  onPressed: isSaving ? null : () async {
                     if (formKey.currentState!.validate()) {
                       if (minutes == null && pdfBytes == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -1824,27 +1949,52 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         );
                         return;
                       }
-                      final newMinutes = MeetingMinutesModel(
-                        id: minutes?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-                        title: titleCtrl.text.trim(),
-                        date: dateCtrl.text.trim(),
-                        pdfName: pdfName,
-                        pdfUrl: minutes?.pdfUrl ?? '',
-                        status: minutes?.status ?? 'pending',
-                        createdAt: minutes?.createdAt ?? DateTime.now().toIso8601String(),
-                      );
-                      bool success;
-                      if (minutes == null) {
-                        success = await context.read<MeetingMinutesProvider>().addMinutes(newMinutes, pdfBytes!);
-                      } else {
-                        success = await context.read<MeetingMinutesProvider>().updateMinutes(newMinutes, pdfBytes);
-                      }
-                      if (success && dialogCtx.mounted) {
-                        Navigator.pop(dialogCtx);
+                      
+                      setDialogState(() {
+                        isSaving = true;
+                      });
+
+                      try {
+                        final newMinutes = MeetingMinutesModel(
+                          id: minutes?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                          title: titleCtrl.text.trim(),
+                          date: dateCtrl.text.trim(),
+                          pdfName: pdfName,
+                          pdfUrl: minutes?.pdfUrl ?? '',
+                          status: minutes?.status ?? 'pending',
+                          createdAt: minutes?.createdAt ?? DateTime.now().toIso8601String(),
+                        );
+                        bool success;
+                        if (minutes == null) {
+                          success = await context.read<MeetingMinutesProvider>().addMinutes(newMinutes, pdfBytes!);
+                        } else {
+                          success = await context.read<MeetingMinutesProvider>().updateMinutes(newMinutes, pdfBytes);
+                        }
+                        if (success && dialogCtx.mounted) {
+                          Navigator.pop(dialogCtx);
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error saving: $e')),
+                          );
+                        }
+                      } finally {
+                        if (dialogCtx.mounted) {
+                          setDialogState(() {
+                            isSaving = false;
+                          });
+                        }
                       }
                     }
                   },
-                  child: const Text('Save'),
+                  child: isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Save'),
                 ),
               ],
             );
@@ -2241,6 +2391,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     showDialog(
       context: context,
       builder: (dialogCtx) {
+        bool isSaving = false;
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
@@ -2290,7 +2441,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () async {
+                            onPressed: isSaving ? null : () async {
                               final result = await FilePicker.platform.pickFiles(
                                 type: FileType.custom,
                                 allowedExtensions: ['pdf'],
@@ -2318,11 +2469,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(dialogCtx),
+                  onPressed: isSaving ? null : () => Navigator.pop(dialogCtx),
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: () async {
+                  onPressed: isSaving ? null : () async {
                     if (formKey.currentState!.validate()) {
                       if (formCircular == null && pdfBytes == null && urlCtrl.text.trim().isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -2330,35 +2481,60 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         );
                         return;
                       }
-                      final newForm = FormCircularModel(
-                        id: formCircular?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-                        title: titleCtrl.text.trim(),
-                        circularNumber: numCtrl.text.trim().isEmpty ? null : numCtrl.text.trim(),
-                        date: dateCtrl.text.trim(),
-                        pdfName: pdfName,
-                        pdfUrl: formCircular?.pdfUrl ?? '',
-                        externalUrl: urlCtrl.text.trim().isEmpty ? null : urlCtrl.text.trim(),
-                        createdAt: formCircular?.createdAt ?? DateTime.now().toIso8601String(),
-                      );
-                      bool success;
-                      if (formCircular == null) {
-                        success = await context.read<FormsCircularsProvider>().addForm(newForm, pdfBytes);
+
+                      setDialogState(() {
+                        isSaving = true;
+                      });
+
+                      try {
+                        final newForm = FormCircularModel(
+                          id: formCircular?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                          title: titleCtrl.text.trim(),
+                          circularNumber: numCtrl.text.trim().isEmpty ? null : numCtrl.text.trim(),
+                          date: dateCtrl.text.trim(),
+                          pdfName: pdfName,
+                          pdfUrl: formCircular?.pdfUrl ?? '',
+                          externalUrl: urlCtrl.text.trim().isEmpty ? null : urlCtrl.text.trim(),
+                          createdAt: formCircular?.createdAt ?? DateTime.now().toIso8601String(),
+                        );
+                        bool success;
+                        if (formCircular == null) {
+                          success = await context.read<FormsCircularsProvider>().addForm(newForm, pdfBytes);
+                          if (success && dialogCtx.mounted) {
+                            await dialogCtx.read<NotificationProvider>().sendSystemNotification(
+                              title: 'New Form or Circular',
+                              body: newForm.title,
+                              routingPath: AppRoutes.formsCirculars,
+                            );
+                          }
+                        } else {
+                          success = await context.read<FormsCircularsProvider>().updateForm(newForm, pdfBytes);
+                        }
                         if (success && dialogCtx.mounted) {
-                          await dialogCtx.read<NotificationProvider>().sendSystemNotification(
-                            title: 'New Form or Circular',
-                            body: newForm.title,
-                            routingPath: AppRoutes.formsCirculars,
+                          Navigator.pop(dialogCtx);
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error saving: $e')),
                           );
                         }
-                      } else {
-                        success = await context.read<FormsCircularsProvider>().updateForm(newForm, pdfBytes);
-                      }
-                      if (success && dialogCtx.mounted) {
-                        Navigator.pop(dialogCtx);
+                      } finally {
+                        if (dialogCtx.mounted) {
+                          setDialogState(() {
+                            isSaving = false;
+                          });
+                        }
                       }
                     }
                   },
-                  child: const Text('Save'),
+                  child: isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Save'),
                 ),
               ],
             );
@@ -3121,16 +3297,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                       child: Stack(
                                         fit: StackFit.expand,
                                         children: [
-                                          img.imageUrl.startsWith('mock://')
-                                              ? Image.memory(
-                                                  base64Decode(locator<SharedPreferences>().getString('mock_storage_gallery_${img.id}') ?? ''),
-                                                  fit: BoxFit.cover,
-                                                )
-                                              : Image.network(
-                                                  img.imageUrl,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image),
-                                                ),
+                                          Image.network(
+                                            img.imageUrl,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image),
+                                          ),
                                           Positioned(
                                             top: 4,
                                             right: 4,
@@ -3152,8 +3323,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                                     icon: const Icon(Icons.delete, size: 12, color: AppColors.error),
                                                     onPressed: () => _confirmDelete(
                                                       context,
-                                                      title: 'Delete Image',
-                                                      content: 'Are you sure you want to delete this image?',
+                                                      title: 'Delete Photo',
+                                                      content: 'Are you sure you want to delete this photo?',
                                                       onConfirm: () => provider.deleteImage(img),
                                                     ),
                                                   ),
@@ -3164,15 +3335,13 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                         ],
                                       ),
                                     ),
-                                    Container(
-                                      padding: const EdgeInsets.all(AppSpacing.xs),
-                                      color: Colors.white,
+                                    Padding(
+                                      padding: const EdgeInsets.all(AppSpacing.md),
                                       child: Text(
                                         img.title,
-                                        style: AppTextStyle.bodySm().copyWith(fontWeight: FontWeight.bold),
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        textAlign: TextAlign.center,
                                       ),
                                     ),
                                   ],
@@ -3191,6 +3360,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final titleCtrl = TextEditingController(text: image?.title ?? '');
     Uint8List? imageBytes;
     String? originalFileName;
+    bool isSaving = false;
 
     showDialog(
       context: context,
@@ -3198,7 +3368,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text(image == null ? 'Upload Gallery Photo' : 'Update Gallery Photo'),
+              title: Text(image == null ? 'Upload Photo' : 'Update Photo'),
               content: SingleChildScrollView(
                 child: Form(
                   key: formKey,
@@ -3206,9 +3376,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       GestureDetector(
-                        onTap: () async {
+                        onTap: isSaving ? null : () async {
                           final picker = ImagePicker();
-                          // Compression settings: 70% quality, 1024x1024 max size
                           final img = await picker.pickImage(
                             source: ImageSource.gallery,
                             imageQuality: 70,
@@ -3239,12 +3408,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                               : (image != null
                                   ? ClipRRect(
                                       borderRadius: AppRadius.borderMd,
-                                      child: image.imageUrl.startsWith('mock://')
-                                          ? Image.memory(
-                                              base64Decode(locator<SharedPreferences>().getString('mock_storage_gallery_${image.id}') ?? ''),
-                                              fit: BoxFit.cover,
-                                            )
-                                          : Image.network(image.imageUrl, fit: BoxFit.cover),
+                                      child: Image.network(
+                                        image.imageUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image),
+                                      ),
                                     )
                                   : const Column(
                                       mainAxisAlignment: MainAxisAlignment.center,
@@ -3272,43 +3440,69 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(dialogCtx),
+                  onPressed: isSaving ? null : () => Navigator.pop(dialogCtx),
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: () async {
-                    if (formKey.currentState!.validate()) {
-                      if (image == null && imageBytes == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Please select an image.')),
-                        );
-                        return;
-                      }
-                      final newImage = GalleryImageModel(
-                        id: image?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-                        title: titleCtrl.text.trim(),
-                        imageUrl: image?.imageUrl ?? '',
-                        createdAt: image?.createdAt ?? DateTime.now().toIso8601String(),
-                      );
-                      bool success;
-                      if (image == null) {
-                        success = await context.read<GalleryProvider>().addImage(newImage, imageBytes!);
-                        if (success && dialogCtx.mounted) {
-                          await dialogCtx.read<NotificationProvider>().sendSystemNotification(
-                            title: 'New Gallery Photo',
-                            body: newImage.title,
-                            routingPath: AppRoutes.gallery,
-                          );
-                        }
-                      } else {
-                        success = await context.read<GalleryProvider>().updateImage(newImage, imageBytes);
-                      }
-                      if (success && dialogCtx.mounted) {
-                        Navigator.pop(dialogCtx);
-                      }
-                    }
-                  },
-                  child: const Text('Save'),
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          if (formKey.currentState!.validate()) {
+                            if (image == null && imageBytes == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please select an image.')),
+                              );
+                              return;
+                            }
+                            setDialogState(() {
+                              isSaving = true;
+                            });
+                            
+                            final newImage = GalleryImageModel(
+                              id: image?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                              title: titleCtrl.text.trim(),
+                              imageUrl: image?.imageUrl ?? '',
+                              createdAt: image?.createdAt ?? DateTime.now().toIso8601String(),
+                            );
+                            
+                            final galleryProvider = context.read<GalleryProvider>();
+                            bool success;
+                            if (image == null) {
+                              success = await galleryProvider.addImage(newImage, imageBytes!);
+                              if (success && dialogCtx.mounted) {
+                                final notificationProvider = dialogCtx.read<NotificationProvider>();
+                                await notificationProvider.sendSystemNotification(
+                                  title: 'New Gallery Photo',
+                                  body: newImage.title,
+                                  routingPath: AppRoutes.gallery,
+                                  // Removed unnecessary system notifications code here
+                                );
+                              }
+                            } else {
+                              success = await galleryProvider.updateImage(newImage, imageBytes);
+                            }
+                            
+                            if (success && dialogCtx.mounted) {
+                              Navigator.pop(dialogCtx);
+                            } else {
+                              if (dialogCtx.mounted) {
+                                ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                                  SnackBar(content: Text(galleryProvider.error ?? 'Failed to save photo.')),
+                                );
+                              }
+                              setDialogState(() {
+                                isSaving = false;
+                              });
+                            }
+                          }
+                        },
+                  child: isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Save'),
                 ),
               ],
             );

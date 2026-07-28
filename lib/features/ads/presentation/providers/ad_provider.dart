@@ -26,11 +26,16 @@ class AdProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> fetchAds() async {
+  Future<void> fetchAds({bool force = false}) async {
+    if (!force && _ads.isNotEmpty) {
+      return;
+    }
     _setLoading(true);
     _setError(null);
     try {
       _ads = await _repository.getAds();
+      print(_ads);
+      print("_ads");
     } catch (e) {
       _setError('Failed to fetch ads: ${e.toString()}');
     } finally {
@@ -42,7 +47,7 @@ class AdProvider extends ChangeNotifier {
     _setError(null);
     try {
       await _repository.addAd(model: ad, fileBytes: fileBytes);
-      await fetchAds();
+      await fetchAds(force: true);
       return true;
     } catch (e) {
       _setError('Failed to add ad: ${e.toString()}');
@@ -54,7 +59,7 @@ class AdProvider extends ChangeNotifier {
     _setError(null);
     try {
       await _repository.updateAd(model: ad, fileBytes: fileBytes);
-      await fetchAds();
+      await fetchAds(force: true);
       return true;
     } catch (e) {
       _setError('Failed to update ad: ${e.toString()}');

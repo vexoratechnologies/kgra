@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_style.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../notification/presentation/providers/notification_provider.dart';
+import '../../../notification/presentation/screens/notifications_screen.dart';
 import '../../../../core/routes/app_routes.dart';
 import 'home_screen.dart';
 
@@ -27,7 +31,7 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
     super.initState();
     _screens = [
       const HomeScreen(),
-      const _AlertsScreen(),
+      const NotificationsScreen(showBackButton: false),
       const _ProfileScreen(),
       const _MenuScreen(),
     ];
@@ -37,6 +41,10 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
     setState(() {
       _selectedIndex = index;
     });
+    if (index == 1) {
+      // Trigger a fresh fetch of notifications when the Alerts tab is selected
+      context.read<NotificationProvider>().fetchNotifications();
+    }
   }
 
   @override
@@ -70,154 +78,95 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
       ),
       // WhatsApp Floating Button in bottom-right corner matching screenshot
       floatingActionButton: _selectedIndex == 0
-          ? FloatingActionButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Row(
-                      children: [
-                        Icon(Icons.chat, color: Colors.white),
-                        SizedBox(width: 10),
-                        Text('Opening KGRA WhatsApp Help Desk...'),
-                      ],
-                    ),
-                    backgroundColor: Color(0xFF25D366),
-                    duration: Duration(seconds: 2),
+          ? Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.rectangle,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
                   ),
-                );
-              },
-              backgroundColor: const Color(0xFF25D366), // Official WhatsApp Green
-              foregroundColor: Colors.white,
-              shape: const CircleBorder(),
-              child: const Icon(Icons.chat, size: 28),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () async {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Row(
+                            children: [
+                              Image.asset(
+                                'assets/icon/apple.png',
+                                width: 24,
+                                height: 24,
+                              ),
+                              const SizedBox(width: 10),
+                              const Text('Opening KGRA WhatsApp Help Desk...'),
+                            ],
+                          ),
+                          backgroundColor: const Color(0xFF25D366),
+                          duration: const Duration(seconds: 1),
+                        ),
+                      );
+
+                      String resolvedNumber = '919747867327'; // Default fallback
+                      try {
+                        final database = FirebaseDatabase.instance;
+                        var ref = database.ref('whatsapp_number');
+                        var snapshot = await ref.get();
+                        if (!snapshot.exists) {
+                          ref = database.ref('settings/whatsapp');
+                          snapshot = await ref.get();
+                        }
+                        if (snapshot.exists && snapshot.value != null) {
+                          resolvedNumber = snapshot.value.toString();
+                        }
+                      } catch (e) {
+                        debugPrint('Failed to get WhatsApp number from RTDB: $e');
+                      }
+
+                      // Format number for wa.me link
+                      String cleanNumber = resolvedNumber.replaceAll(RegExp(r'\D'), '');
+                      if (!cleanNumber.startsWith('91') && cleanNumber.length == 10) {
+                        cleanNumber = '91$cleanNumber';
+                      }
+
+                      final uri = Uri.parse('https://wa.me/$cleanNumber');
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      } else {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Could not launch WhatsApp. Please check if it is installed.'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    child: Image.asset(
+                      'assets/icon/apple.png',
+                      width: 56,
+                      height: 56,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+              ),
             )
           : null,
     );
   }
 }
 
-/// ----------------------------------------------------
-/// Alerts / Notifications Tab Screen
-/// ----------------------------------------------------
-class _AlertsScreen extends StatelessWidget {
-  const _AlertsScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    final alerts = [
-      {
-        'title': 'New Zonal Committee Appointed',
-        'desc': 'Kerala Government Radiographers\' Association announces new executive representatives for the Trivandrum zone.',
-        'time': '2 hours ago',
-        'isNew': true,
-      },
-      {
-        'title': 'Annual Zonal Conference Registration Open',
-        'desc': 'Register early for the Annual Zonal Conference at Trivandrum Medical College Auditorium to reserve your seat.',
-        'time': '1 day ago',
-        'isNew': true,
-      },
-      {
-        'title': 'Radiation Safety Seminar Postponed',
-        'desc': 'The upcoming interactive session scheduled for this Saturday has been rescheduled to next month. Stay tuned for details.',
-        'time': '3 days ago',
-        'isNew': false,
-      },
-    ];
-
-    return Scaffold(
-      backgroundColor: AppColors.brandBackground,
-      appBar: AppBar(
-        title: Text(
-          'Notifications',
-          style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-      ),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        itemCount: alerts.length,
-        separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
-        itemBuilder: (context, index) {
-          final alert = alerts[index];
-          final isNew = alert['isNew'] as bool;
-          return Container(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: AppRadius.borderLg,
-              border: Border.all(
-                color: isNew
-                    ? AppColors.brandPrimary.withValues(alpha: 0.15)
-                    : const Color(0xFFF1F5F9),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.02),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      alert['time'] as String,
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                    ),
-                    if (isNew)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.brandPrimary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          'NEW',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.brandPrimary,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  alert['title'] as String,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: isNew ? AppColors.brandPrimary : AppColors.brandSecondary,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  alert['desc'] as String,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF475569),
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
 
 /// ----------------------------------------------------
 /// Profile Tab Screen
@@ -428,16 +377,16 @@ class _MenuScreen extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
           // Section 1: Administration
-          _buildMenuSectionTitle('ADMINISTRATION'),
-          _buildMenuItem(
-            icon: LucideIcons.shieldAlert,
-            title: 'Access Admin Portal',
-            subtitle: 'Manage members approvals and settings',
-            iconColor: AppColors.brandPrimary,
-            bgColor: AppColors.brandPrimary.withValues(alpha: 0.08),
-            onTap: () => context.push(AppRoutes.adminUsers),
-          ),
-          const SizedBox(height: AppSpacing.lg),
+          // _buildMenuSectionTitle('ADMINISTRATION'),
+          // _buildMenuItem(
+          //   icon: LucideIcons.shieldAlert,
+          //   title: 'Access Admin Portal',
+          //   subtitle: 'Manage members approvals and settings',
+          //   iconColor: AppColors.brandPrimary,
+          //   bgColor: AppColors.brandPrimary.withValues(alpha: 0.08),
+          //   onTap: () => context.push(AppRoutes.adminUsers),
+          // ),
+          // const SizedBox(height: AppSpacing.lg),
 
           // Section 2: General Options
           _buildMenuSectionTitle('ABOUT ASSOCIATION'),
@@ -453,19 +402,19 @@ class _MenuScreen extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: AppSpacing.sm),
-          _buildMenuItem(
-            icon: LucideIcons.bookOpen,
-            title: 'Code of Ethics',
-            subtitle: 'Professional standards and regulations',
-            iconColor: const Color(0xFF475569),
-            bgColor: const Color(0xFFF1F5F9),
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Displaying Professional Code of Ethics...')),
-              );
-            },
-          ),
+          // const SizedBox(height: AppSpacing.sm),
+          // _buildMenuItem(
+          //   icon: LucideIcons.bookOpen,
+          //   title: 'Code of Ethics',
+          //   subtitle: 'Professional standards and regulations',
+          //   iconColor: const Color(0xFF475569),
+          //   bgColor: const Color(0xFFF1F5F9),
+          //   onTap: () {
+          //     ScaffoldMessenger.of(context).showSnackBar(
+          //       const SnackBar(content: Text('Displaying Professional Code of Ethics...')),
+          //     );
+          //   },
+          // ),
           const SizedBox(height: AppSpacing.lg),
 
           // Section 3: Support

@@ -24,10 +24,17 @@ class _AdminSplashScreenState extends State<AdminSplashScreen> {
     if (!mounted) return;
 
     final adminProvider = context.read<AdminProvider>();
+    await adminProvider.checkAdminSession();
     final currentAdmin = adminProvider.currentAdmin;
 
-    if (currentAdmin != null && currentAdmin.role == 'zonal_admin') {
-      context.go(AppRoutes.adminUsers);
+    if (currentAdmin != null) {
+      if (currentAdmin.role == 'super_admin') {
+        context.go(AppRoutes.superAdminDashboard);
+      } else if (currentAdmin.role == 'zonal_admin') {
+        context.go(AppRoutes.adminUsers);
+      } else {
+        context.go(AppRoutes.adminLogin);
+      }
     } else {
       context.go(AppRoutes.adminLogin);
     }
@@ -45,15 +52,21 @@ class _AdminSplashScreenState extends State<AdminSplashScreen> {
               width: 90,
               height: 90,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
+                color: Colors.white,
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1.5),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
               ),
-              child: const Center(
-                child: Icon(
-                  Icons.admin_panel_settings_outlined,
-                  size: 44,
-                  color: Colors.white,
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/icon/kgra.jpeg',
+                  fit: BoxFit.cover,
                 ),
               ),
             ),

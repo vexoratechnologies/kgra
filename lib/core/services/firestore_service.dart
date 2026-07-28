@@ -428,9 +428,10 @@ class FirestoreService {
   Future<List<GalleryImageModel>> getGalleryImages() async {
     final querySnapshot = await _firestore
         .collection(FirestoreCollections.gallery)
-        .orderBy('createdAt', descending: true)
         .get();
-    return querySnapshot.docs.map((doc) => GalleryImageModel.fromJson(doc.data())).toList();
+    final list = querySnapshot.docs.map((doc) => GalleryImageModel.fromJson(doc.data())).toList();
+    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list;
   }
 
   Future<void> deleteGalleryImage(String id) async {
@@ -454,9 +455,10 @@ class FirestoreService {
   Future<List<VideoModel>> getVideos() async {
     final querySnapshot = await _firestore
         .collection(FirestoreCollections.videos)
-        .orderBy('createdAt', descending: true)
         .get();
-    return querySnapshot.docs.map((doc) => VideoModel.fromJson(doc.data())).toList();
+    final list = querySnapshot.docs.map((doc) => VideoModel.fromJson(doc.data())).toList();
+    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list;
   }
 
   Future<void> deleteVideo(String id) async {
@@ -510,9 +512,10 @@ class FirestoreService {
   Future<List<AdModel>> getAds() async {
     final querySnapshot = await _firestore
         .collection(FirestoreCollections.ads)
-        .orderBy('createdAt', descending: true)
         .get();
-    return querySnapshot.docs.map((doc) => AdModel.fromJson(doc.data())).toList();
+    final list = querySnapshot.docs.map((doc) => AdModel.fromJson(doc.data())).toList();
+    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list;
   }
 
   Future<void> deleteAd(String id) async {

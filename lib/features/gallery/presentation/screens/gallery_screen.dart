@@ -1,12 +1,9 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_style.dart';
-import '../../../../injection.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../providers/gallery_provider.dart';
@@ -28,17 +25,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   Widget _buildImageWidget(String url, String docId) {
-    if (url.startsWith('mock://')) {
-      final prefs = locator<SharedPreferences>();
-      final base64String = prefs.getString('mock_storage_gallery_$docId');
-      if (base64String != null && base64String.isNotEmpty) {
-        return Image.memory(
-          base64Decode(base64String),
-          fit: BoxFit.cover,
-        );
-      }
-      return const Icon(Icons.broken_image, size: 50, color: Colors.grey);
-    }
     return Image.network(
       url,
       fit: BoxFit.cover,
@@ -69,16 +55,11 @@ class _GalleryScreenState extends State<GalleryScreen> {
               maxScale: 4.0,
               child: Hero(
                 tag: 'gallery_$docId',
-                child: url.startsWith('mock://')
-                    ? Image.memory(
-                        base64Decode(locator<SharedPreferences>().getString('mock_storage_gallery_$docId') ?? ''),
-                        fit: BoxFit.contain,
-                      )
-                    : Image.network(
-                        url,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 100, color: Colors.white),
-                      ),
+                child: Image.network(
+                  url,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 100, color: Colors.white),
+                ),
               ),
             ),
           ),

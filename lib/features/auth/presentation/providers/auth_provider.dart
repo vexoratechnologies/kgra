@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/auth_repository.dart';
 
@@ -89,6 +90,18 @@ class AuthProvider extends ChangeNotifier {
       debugPrint('Failed to load cached user session: $e');
     }
 
+    // Wait for Firebase Auth to finish restoring its session asynchronously
+    try {
+      if (Firebase.apps.isNotEmpty) {
+        await FirebaseAuth.instance.authStateChanges().first.timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => null,
+        );
+      }
+    } catch (e) {
+      debugPrint('Firebase Auth initialization wait timed out or failed: $e');
+    }
+
     // 2. Perform background fetch from remote database to check latest approval/details
     try {
       final user = await _authRepository.getCurrentUser();
@@ -97,11 +110,13 @@ class AuthProvider extends ChangeNotifier {
         _isRegistered = true;
         _isPendingApproval = !user.isApproved;
       } else {
-        // If user was deleted/revoked, log out
-        _currentUser = null;
-        _isRegistered = false;
-        _isPendingApproval = false;
-        await _authRepository.clearUserCache();
+        // Only clear cache and log out if there is actually NO active Firebase user session
+        if (FirebaseAuth.instance.currentUser == null) {
+          _currentUser = null;
+          _isRegistered = false;
+          _isPendingApproval = false;
+          await _authRepository.clearUserCache();
+        }
       }
       notifyListeners();
     } catch (e) {
@@ -120,13 +135,17 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     _setError(null);
     try {
+      // Ensure an anonymous session is running to satisfy Firestore security rules
+      if (FirebaseAuth.instance.currentUser == null) {
+        await FirebaseAuth.instance.signInAnonymously();
+      }
       final exists = await _authRepository.checkUserExists(phoneNumber);
-      _setLoading(false);
       return exists;
     } catch (e) {
       _setError('Failed to check user existence: ${e.toString()}');
-      _setLoading(false);
       return false;
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -223,7 +242,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Helper registration action called internally after verification.
   Future<bool> _registerWithUidAndName(
     String fullName, {
     String? designation,
@@ -234,11 +252,7 @@ class AuthProvider extends ChangeNotifier {
     String? membershipId,
     String? dateOfRetirement,
   }) async {
-    final uid = _authRepository.getCurrentUid();
-    if (uid == null) {
-      _setError('Security session expired.');
-      return false;
-    }
+    final uid = DateTime.now().millisecondsSinceEpoch.toString();
     try {
       String? profileImageId;
       if (photoBase64 != null && photoBase64.isNotEmpty) {
@@ -271,7 +285,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Registers a new user. The number verified in OTP is saved.
   Future<bool> registerUser(
     String fullName, {
     String? designation,
@@ -287,15 +300,10 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
 
-    final uid = _authRepository.getCurrentUid();
-    if (uid == null) {
-      _setError('Security session expired. Please verify OTP again.');
-      return false;
-    }
-
     _setLoading(true);
     _setError(null);
     try {
+      final uid = DateTime.now().millisecondsSinceEpoch.toString();
       String? profileImageId;
       if (photoBase64 != null && photoBase64.isNotEmpty) {
         profileImageId = 'img_$uid';

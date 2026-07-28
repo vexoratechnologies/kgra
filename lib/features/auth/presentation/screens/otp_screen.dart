@@ -7,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_style.dart';
+import '../../../../core/utils/app_snack_bar.dart';
 import '../providers/auth_provider.dart';
 
 /// OtpScreen implements mockup 2 (Verify OTP page).
@@ -18,7 +19,7 @@ class OtpScreen extends StatefulWidget {
 }
 
 class _OtpScreenState extends State<OtpScreen> {
-  static const int _totalTimerSeconds = 60;
+  static const int _totalTimerSeconds = 120;
   int _secondsRemaining = _totalTimerSeconds;
   Timer? _timer;
   
@@ -68,12 +69,7 @@ class _OtpScreenState extends State<OtpScreen> {
     // Combine all digits
     final otpCode = _controllers.map((c) => c.text.trim()).join();
     if (otpCode.length != 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter all 6 digits of the OTP.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppSnackBar.showError(context, 'Please enter all 6 digits of the OTP.');
       return;
     }
 
@@ -92,12 +88,7 @@ class _OtpScreenState extends State<OtpScreen> {
         context.go(AppRoutes.home);
       }
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.error ?? 'Verification failed.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppSnackBar.showError(context, authProvider.error ?? 'Verification failed.');
     }
   }
 
@@ -111,11 +102,7 @@ class _OtpScreenState extends State<OtpScreen> {
     final success = await authProvider.sendOtp(phone);
     if (success && mounted) {
       _startTimer();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('OTP sent again successfully.'),
-        ),
-      );
+      AppSnackBar.showSuccess(context, 'OTP sent again successfully.');
     }
   }
 

@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../../auth/data/models/admin_model.dart';
 import '../../data/repositories/admin_repository.dart';
@@ -8,9 +10,15 @@ import '../../data/repositories/admin_repository.dart';
 /// AdminProvider manages state and user approval processes for the admin dashboard.
 class AdminProvider extends ChangeNotifier {
   final AdminRepository _adminRepository;
+  final SharedPreferences _prefs;
 
-  AdminProvider({required AdminRepository adminRepository})
-      : _adminRepository = adminRepository;
+  static const String _cachedAdminKey = 'cached_current_admin';
+
+  AdminProvider({
+    required AdminRepository adminRepository,
+    required SharedPreferences prefs,
+  })  : _adminRepository = adminRepository,
+        _prefs = prefs;
 
   AdminModel? _currentAdmin;
   List<AdminModel> _admins = [];
@@ -32,9 +40,59 @@ class AdminProvider extends ChangeNotifier {
   List<String> get zones => _zones;
   List<String> get designations => _designations;
 
-  List<UserModel> get pendingUsers => _pendingUsers;
-  List<UserModel> get approvedUsers => _approvedUsers;
-  List<UserModel> get rejectedUsers => _rejectedUsers;
+  List<UserModel> get pendingUsers {
+    debugPrint('pendingUsers called. Total raw users: ${_pendingUsers.length}');
+    if (_currentAdmin != null && _currentAdmin!.role == 'zonal_admin') {
+      final adminZone = _currentAdmin!.zone?.trim().toLowerCase();
+      debugPrint('Filtering pending users for Zonal Admin in zone: "$adminZone"');
+      if (adminZone == null || adminZone.isEmpty || adminZone == 'null') {
+        return _pendingUsers;
+      }
+      final filtered = _pendingUsers.where((u) {
+        final userZone = u.zone?.trim().toLowerCase();
+        final matches = (userZone == adminZone) || (userZone == null || userZone.isEmpty || userZone == 'null');
+        debugPrint('  User: ${u.name}, Zone: "${u.zone}" -> matches: $matches');
+        return matches;
+      }).toList();
+      debugPrint('Filtered pending users count: ${filtered.length}');
+      return filtered;
+    }
+    return _pendingUsers;
+  }
+
+  List<UserModel> get approvedUsers {
+    debugPrint('approvedUsers called. Total raw users: ${_approvedUsers.length}');
+    if (_currentAdmin != null && _currentAdmin!.role == 'zonal_admin') {
+      final adminZone = _currentAdmin!.zone?.trim().toLowerCase();
+      debugPrint('Filtering approved users for Zonal Admin in zone: "$adminZone"');
+      if (adminZone == null || adminZone.isEmpty || adminZone == 'null') {
+        return _approvedUsers;
+      }
+      final filtered = _approvedUsers.where((u) {
+        final userZone = u.zone?.trim().toLowerCase();
+        final matches = (userZone == adminZone) || (userZone == null || userZone.isEmpty || userZone == 'null');
+        debugPrint('  User: ${u.name}, Zone: "${u.zone}" -> matches: $matches');
+        return matches;
+      }).toList();
+      debugPrint('Filtered approved users count: ${filtered.length}');
+      return filtered;
+    }
+    return _approvedUsers;
+  }
+
+  List<UserModel> get rejectedUsers {
+    if (_currentAdmin != null && _currentAdmin!.role == 'zonal_admin') {
+      final adminZone = _currentAdmin!.zone?.trim().toLowerCase();
+      if (adminZone == null || adminZone.isEmpty || adminZone == 'null') {
+        return _rejectedUsers;
+      }
+      return _rejectedUsers.where((u) {
+        final userZone = u.zone?.trim().toLowerCase();
+        return (userZone == adminZone) || (userZone == null || userZone.isEmpty || userZone == 'null');
+      }).toList();
+    }
+    return _rejectedUsers;
+  }
   bool get isLoading => _isLoading;
   String? get error => _error;
   Map<String, String> get userImages => _userImages;
@@ -57,6 +115,21 @@ class AdminProvider extends ChangeNotifier {
     }
   }
 
+  /// Checks and restores the active admin session from local storage.
+  Future<void> checkAdminSession() async {
+    _setError(null);
+    try {
+      final jsonStr = _prefs.getString(_cachedAdminKey);
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final decoded = jsonDecode(jsonStr);
+        _currentAdmin = AdminModel.fromJson(Map<String, dynamic>.from(decoded));
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Failed to load cached admin session: $e');
+    }
+  }
+
   /// Logs in administrative credentials.
   Future<bool> loginAdmin(String username, String password, {String? allowedRole}) async {
     _setLoading(true);
@@ -75,6 +148,11 @@ class AdminProvider extends ChangeNotifier {
           return false;
         }
         _currentAdmin = admin;
+        
+        // Cache admin session details locally
+        final jsonStr = jsonEncode(admin.toJson());
+        await _prefs.setString(_cachedAdminKey, jsonStr);
+
         notifyListeners();
         return true;
       }
@@ -91,6 +169,7 @@ class AdminProvider extends ChangeNotifier {
   /// Clears active admin session.
   void logoutAdmin() {
     _currentAdmin = null;
+    _prefs.remove(_cachedAdminKey);
     notifyListeners();
   }
 
