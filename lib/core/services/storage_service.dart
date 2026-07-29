@@ -36,9 +36,7 @@ class StorageService {
         },
       );
 
-      final snapshot = await uploadTask.timeout(const Duration(seconds: 15), onTimeout: () {
-        throw TimeoutException('Firebase Storage upload timed out after 15 seconds. Please check your network connection, and make sure your Firebase Storage bucket exists and rules allow uploads.');
-      });
+      final snapshot = await uploadTask;
       debugPrint('Upload completed successfully. Getting download URL.');
       final downloadUrl = await snapshot.ref.getDownloadURL();
       debugPrint('Got download URL: $downloadUrl');

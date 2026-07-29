@@ -108,6 +108,7 @@ flutter:
     - assets/icon/kgra.jpeg
     - assets/icon/apple.png
     - assets/icon/app_icon.png
+    - assets/icon/splash.jpeg
 
   # To add assets to your application, add an assets section, like this:
   # assets:

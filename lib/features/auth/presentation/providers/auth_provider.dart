@@ -1,6 +1,9 @@
+import 'dart:convert' show base64Decode;
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:get_it/get_it.dart';
+import '../../../../core/services/storage_service.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/auth_repository.dart';
 
@@ -31,11 +34,13 @@ class AuthProvider extends ChangeNotifier {
   bool _isVerificationCompleted = false;
   bool _isRegistered = false;
   bool _isPendingApproval = false;
+  String? _currentUserPhotoBase64;
 
   // Getters
   bool get isLoading => _isLoading;
   String? get error => _error;
   UserModel? get currentUser => _currentUser;
+  String? get currentUserPhotoBase64 => _currentUserPhotoBase64;
   String? get verificationPhone => _verificationPhone;
   bool get isVerificationCompleted => _isVerificationCompleted;
   bool get isRegistered => _isRegistered;
@@ -69,7 +74,32 @@ class AuthProvider extends ChangeNotifier {
     _isVerificationCompleted = false;
     _isRegistered = false;
     _isPendingApproval = false;
+    _currentUserPhotoBase64 = null;
     notifyListeners();
+  }
+
+  /// Lazily fetches the current user's profile image base64.
+  Future<void> _fetchCurrentUserImage() async {
+    if (_currentUser == null || _currentUser!.profileImageId == null) {
+      _currentUserPhotoBase64 = null;
+      notifyListeners();
+      return;
+    }
+    // If image resides in Firebase Storage, skip base64 load
+    if (_currentUser!.profileImageId!.startsWith('http')) {
+      _currentUserPhotoBase64 = null;
+      notifyListeners();
+      return;
+    }
+    try {
+      final imgData = await _authRepository.getUserImage(_currentUser!.profileImageId!);
+      if (imgData != null && imgData['imageBase64'] != null) {
+        _currentUserPhotoBase64 = imgData['imageBase64'] as String;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Failed to load current user profile image: $e');
+    }
   }
 
   /// Checks if an active session is running on app launch.
@@ -84,6 +114,7 @@ class AuthProvider extends ChangeNotifier {
         _currentUser = cachedUser;
         _isRegistered = true;
         _isPendingApproval = !cachedUser.isApproved;
+        _fetchCurrentUserImage();
         notifyListeners(); // Route immediately to prevent screen flickers
       }
     } catch (e) {
@@ -109,6 +140,7 @@ class AuthProvider extends ChangeNotifier {
         _currentUser = user;
         _isRegistered = true;
         _isPendingApproval = !user.isApproved;
+        _fetchCurrentUserImage();
       } else {
         // Only clear cache and log out if there is actually NO active Firebase user session
         if (FirebaseAuth.instance.currentUser == null) {
@@ -228,6 +260,7 @@ class AuthProvider extends ChangeNotifier {
         if (user.isApproved && user.status == 'approved') {
           _currentUser = user;
           _isPendingApproval = false;
+          _fetchCurrentUserImage();
         } else {
           _currentUser = null;
           _isPendingApproval = true;
@@ -239,6 +272,24 @@ class AuthProvider extends ChangeNotifier {
       _setError(e.toString());
       _setLoading(false);
       return false;
+    }
+  }
+
+  /// Uploads a base64 profile image to Firebase Storage and returns the download URL.
+  Future<String?> _uploadProfileImageToStorage(String uid, String photoBase64) async {
+    try {
+      final decodedBytes = base64Decode(photoBase64);
+      final storageService = GetIt.instance<StorageService>();
+      final downloadUrl = await storageService.uploadImage(
+        folderName: 'profile_images',
+        docId: uid,
+        fileName: 'profile.jpg',
+        fileBytes: decodedBytes,
+      );
+      return downloadUrl;
+    } catch (e) {
+      debugPrint('Failed to upload image to Firebase Storage: $e');
+      return null;
     }
   }
 
@@ -256,8 +307,13 @@ class AuthProvider extends ChangeNotifier {
     try {
       String? profileImageId;
       if (photoBase64 != null && photoBase64.isNotEmpty) {
-        profileImageId = 'img_$uid';
-        await _authRepository.saveUserImage(profileImageId, photoBase64);
+        final downloadUrl = await _uploadProfileImageToStorage(uid, photoBase64);
+        if (downloadUrl != null) {
+          profileImageId = downloadUrl;
+        } else {
+          profileImageId = 'img_$uid';
+          await _authRepository.saveUserImage(profileImageId, photoBase64);
+        }
       }
 
       final newUser = UserModel(
@@ -306,8 +362,13 @@ class AuthProvider extends ChangeNotifier {
       final uid = DateTime.now().millisecondsSinceEpoch.toString();
       String? profileImageId;
       if (photoBase64 != null && photoBase64.isNotEmpty) {
-        profileImageId = 'img_$uid';
-        await _authRepository.saveUserImage(profileImageId, photoBase64);
+        final downloadUrl = await _uploadProfileImageToStorage(uid, photoBase64);
+        if (downloadUrl != null) {
+          profileImageId = downloadUrl;
+        } else {
+          profileImageId = 'img_$uid';
+          await _authRepository.saveUserImage(profileImageId, photoBase64);
+        }
       }
 
       final newUser = UserModel(
@@ -348,6 +409,7 @@ class AuthProvider extends ChangeNotifier {
       if (user != null && user.isApproved && user.status == 'approved') {
         _currentUser = user;
         _isPendingApproval = false;
+        _fetchCurrentUserImage();
       }
     } catch (e) {
       _setError('Failed to check approval status: ${e.toString()}');
@@ -369,6 +431,7 @@ class AuthProvider extends ChangeNotifier {
         await _authRepository.registerUser(approvedUser);
         _isPendingApproval = false;
         _currentUser = approvedUser;
+        _fetchCurrentUserImage();
       }
     } catch (_) {}
     _setLoading(false);
@@ -380,6 +443,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       await _authRepository.signOut();
       _currentUser = null;
+      _currentUserPhotoBase64 = null;
       clearStates();
     } catch (e) {
       _setError(e.toString());

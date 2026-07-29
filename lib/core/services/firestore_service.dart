@@ -381,6 +381,33 @@ class FirestoreService {
     return querySnapshot.docs.map((doc) => NotificationModel.fromJson(doc.data())).toList();
   }
 
+  Future<int> getNotificationsCount() async {
+    final snapshot = await _firestore
+        .collection(FirestoreCollections.notifications)
+        .count()
+        .get();
+    return snapshot.count ?? 0;
+  }
+
+  Future<List<NotificationModel>> getNotificationsPaged({
+    required int limit,
+    String? startAfterCreatedAt,
+  }) async {
+    Query query = _firestore
+        .collection(FirestoreCollections.notifications)
+        .orderBy('createdAt', descending: true)
+        .limit(limit);
+
+    if (startAfterCreatedAt != null && startAfterCreatedAt.isNotEmpty) {
+      query = query.startAfter([startAfterCreatedAt]);
+    }
+
+    final querySnapshot = await query.get();
+    return querySnapshot.docs
+        .map((doc) => NotificationModel.fromJson(doc.data() as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<void> deleteNotification(String id) async {
     await _firestore
         .collection(FirestoreCollections.notifications)

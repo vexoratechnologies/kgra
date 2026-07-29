@@ -1,3 +1,4 @@
+import 'dart:convert' show base64Decode;
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
@@ -35,6 +36,9 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
       const _ProfileScreen(),
       const _MenuScreen(),
     ];
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<NotificationProvider>().fetchNotifications();
+    });
   }
 
   void _onDestinationSelected(int index) {
@@ -47,6 +51,82 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
     }
   }
 
+  Widget _buildNavItem(int index, IconData icon, String label, {bool showBadge = false}) {
+    final isSelected = _selectedIndex == index;
+    final notificationProvider = context.watch<NotificationProvider>();
+    final notificationCount = notificationProvider.totalCount;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _onDestinationSelected(index),
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4.0),
+          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AppColors.brandPrimary.withValues(alpha: 0.08)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(16.0),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(
+                    icon,
+                    color: isSelected ? AppColors.brandPrimary : const Color(0xFF64748B),
+                    size: 22,
+                  ),
+                  if (showBadge && notificationCount > 0)
+                    Positioned(
+                      top: -5,
+                      right: -7,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFDC2626),
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          '$notificationCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: isSelected ? AppColors.brandPrimary : const Color(0xFF64748B),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -54,27 +134,37 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
         index: _selectedIndex,
         children: _screens,
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: _onDestinationSelected,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(LucideIcons.home),
-            label: 'Home',
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(32),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 15,
+                spreadRadius: 1,
+                offset: const Offset(0, 4),
+              ),
+            ],
+            border: Border.all(
+              color: const Color(0xFFF1F5F9),
+              width: 1.0,
+            ),
           ),
-          NavigationDestination(
-            icon: Icon(LucideIcons.bell),
-            label: 'Alerts',
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(0, LucideIcons.home, 'Home'),
+              _buildNavItem(1, LucideIcons.bell, 'Alerts', showBadge: true),
+              _buildNavItem(2, LucideIcons.user, 'Profile'),
+              _buildNavItem(3, LucideIcons.menu, 'Menu'),
+            ],
           ),
-          NavigationDestination(
-            icon: Icon(LucideIcons.user),
-            label: 'Profile',
-          ),
-          NavigationDestination(
-            icon: Icon(LucideIcons.menu),
-            label: 'Menu',
-          ),
-        ],
+        ),
       ),
       // WhatsApp Floating Button in bottom-right corner matching screenshot
       floatingActionButton: _selectedIndex == 0
@@ -219,35 +309,72 @@ class _ProfileScreen extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  // Circle Initial Avatar
-                  Container(
-                    width: 90,
-                    height: 90,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF0057B8), Color(0xFF0F4C81)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.brandPrimary.withValues(alpha: 0.25),
-                          blurRadius: 15,
-                          offset: const Offset(0, 6),
+                  // Circle Profile Avatar (Firebase Storage URL / Base64 / Initials Fallback)
+                  Builder(
+                    builder: (context) {
+                      Widget? avatarImage;
+                      final profileImageId = user?.profileImageId;
+                      if (profileImageId != null && profileImageId.startsWith('http')) {
+                        avatarImage = Image.network(
+                          profileImageId,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(),
+                        );
+                      } else {
+                        final base64Image = authProvider.currentUserPhotoBase64;
+                        if (base64Image != null && base64Image.isNotEmpty) {
+                          try {
+                            final decodedBytes = base64Decode(base64Image);
+                            avatarImage = Image.memory(
+                              decodedBytes,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(),
+                            );
+                          } catch (_) {}
+                        }
+                      }
+
+                      return Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          gradient: avatarImage == null
+                              ? const LinearGradient(
+                                  colors: [Color(0xFF0057B8), Color(0xFF0F4C81)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                )
+                              : null,
+                          color: avatarImage != null ? Colors.white : null,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.brandPrimary.withValues(alpha: 0.25),
+                              blurRadius: 15,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                          border: avatarImage != null
+                              ? Border.all(
+                                  color: AppColors.brandPrimary.withOpacity(0.15),
+                                  width: 2.0,
+                                )
+                              : null,
                         ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Text(
-                        name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'M',
-                        style: const TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
+                        child: avatarImage != null
+                            ? ClipOval(child: avatarImage)
+                            : Center(
+                                child: Text(
+                                  name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'M',
+                                  style: const TextStyle(
+                                    fontSize: 36,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                      );
+                    },
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   Text(
@@ -396,11 +523,7 @@ class _MenuScreen extends StatelessWidget {
             subtitle: 'History, objectives, and working committees',
             iconColor: const Color(0xFF475569),
             bgColor: const Color(0xFFF1F5F9),
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Kerala Government Radiographers\' Association founded in 1980...')),
-              );
-            },
+            onTap: () => context.push(AppRoutes.about),
           ),
           // const SizedBox(height: AppSpacing.sm),
           // _buildMenuItem(

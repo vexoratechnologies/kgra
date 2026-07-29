@@ -17,12 +17,27 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
+  final ScrollController _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<NotificationProvider>().fetchNotifications();
     });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      context.read<NotificationProvider>().fetchMoreNotifications();
+    }
   }
 
   @override
@@ -86,10 +101,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           ),
                         )
                       : ListView.builder(
+                          controller: _scrollController,
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.all(AppSpacing.md),
-                          itemCount: notifications.length,
+                          itemCount: notifications.length + (provider.hasMore ? 1 : 0),
                           itemBuilder: (context, index) {
+                            if (index == notifications.length) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 16.0),
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    color: AppColors.brandPrimary,
+                                    strokeWidth: 2.0,
+                                  ),
+                                ),
+                              );
+                            }
                             final n = notifications[index];
                             return Container(
                               margin: const EdgeInsets.only(bottom: 10),

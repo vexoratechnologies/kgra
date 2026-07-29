@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -12,6 +13,7 @@ import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_style.dart';
 import '../../../../core/widgets/app_pdf_viewer_screen.dart';
+import '../../../../core/utils/file_picker_helper.dart';
 import '../../../../features/auth/data/models/user_model.dart';
 import '../../../../features/state_committee/presentation/providers/state_committee_provider.dart';
 import '../../../../features/state_committee/data/models/committee_member_model.dart';
@@ -1262,15 +1264,26 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                                     ? const Center(
                                                         child: CircularProgressIndicator(strokeWidth: 2),
                                                       )
-                                                    : base64Image != null
+                                                    : (user.profileImageId != null && user.profileImageId!.startsWith('http'))
                                                         ? ClipRRect(
                                                             borderRadius: AppRadius.borderLg,
-                                                            child: Image.memory(
-                                                              base64Decode(base64Image),
+                                                            child: Image.network(
+                                                              user.profileImageId!,
                                                               fit: BoxFit.cover,
+                                                              errorBuilder: (context, error, stackTrace) => const Center(
+                                                                child: Icon(Icons.broken_image, size: 32),
+                                                              ),
                                                             ),
                                                           )
-                                                        : const Center(
+                                                        : base64Image != null
+                                                            ? ClipRRect(
+                                                                borderRadius: AppRadius.borderLg,
+                                                                child: Image.memory(
+                                                                  base64Decode(base64Image),
+                                                                  fit: BoxFit.cover,
+                                                                ),
+                                                              )
+                                                            : const Center(
                                                             child: Column(
                                                               mainAxisAlignment: MainAxisAlignment.center,
                                                               children: [
@@ -1910,15 +1923,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: isSaving ? null : () async {
-                              final result = await FilePicker.platform.pickFiles(
-                                type: FileType.custom,
-                                allowedExtensions: ['pdf'],
-                                withData: true,
-                              );
-                              if (result != null && result.files.single.bytes != null) {
+                              final pickedFile = await pickPdfFile();
+                              if (pickedFile != null) {
                                 setDialogState(() {
-                                  pdfBytes = result.files.single.bytes;
-                                  pdfName = result.files.single.name;
+                                  pdfBytes = pickedFile.bytes;
+                                  pdfName = pickedFile.name;
                                 });
                               }
                             },
@@ -2132,6 +2141,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final dateCtrl = TextEditingController(text: order?.date ?? '');
     String pdfName = order?.pdfName ?? '';
     Uint8List? pdfBytes;
+    bool isSaving = false;
 
     showDialog(
       context: context,
@@ -2149,12 +2159,14 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       controller: titleCtrl,
                       decoration: const InputDecoration(labelText: 'Title *'),
                       validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                      enabled: !isSaving,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: numCtrl,
                       decoration: const InputDecoration(labelText: 'Order Number *'),
                       validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                      enabled: !isSaving,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
@@ -2162,7 +2174,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       readOnly: true,
                       decoration: const InputDecoration(labelText: 'Order Date *', suffixIcon: Icon(Icons.calendar_today)),
                       validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                      onTap: () async {
+                      onTap: isSaving ? null : () async {
                         final picked = await showDatePicker(
                           context: context,
                           initialDate: DateTime.now(),
@@ -2181,16 +2193,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () async {
-                              final result = await FilePicker.platform.pickFiles(
-                                type: FileType.custom,
-                                allowedExtensions: ['pdf'],
-                                withData: true,
-                              );
-                              if (result != null && result.files.single.bytes != null) {
+                            onPressed: isSaving ? null : () async {
+                              final pickedFile = await pickPdfFile();
+                              if (pickedFile != null) {
                                 setDialogState(() {
-                                  pdfBytes = result.files.single.bytes;
-                                  pdfName = result.files.single.name;
+                                  pdfBytes = pickedFile.bytes;
+                                  pdfName = pickedFile.name;
                                 });
                               }
                             },
@@ -2209,11 +2217,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(dialogCtx),
+                  onPressed: isSaving ? null : () => Navigator.pop(dialogCtx),
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: () async {
+                  onPressed: isSaving ? null : () async {
                     if (formKey.currentState!.validate()) {
                       if (order == null && pdfBytes == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -2221,34 +2229,59 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         );
                         return;
                       }
-                      final newOrder = GovernmentOrderModel(
-                        id: order?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-                        title: titleCtrl.text.trim(),
-                        orderNumber: numCtrl.text.trim(),
-                        date: dateCtrl.text.trim(),
-                        pdfName: pdfName,
-                        pdfUrl: order?.pdfUrl ?? '',
-                        createdAt: order?.createdAt ?? DateTime.now().toIso8601String(),
-                      );
-                      bool success;
-                      if (order == null) {
-                        success = await context.read<GovernmentOrdersProvider>().addOrder(newOrder, pdfBytes!);
+
+                      setDialogState(() {
+                        isSaving = true;
+                      });
+
+                      try {
+                        final newOrder = GovernmentOrderModel(
+                          id: order?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                          title: titleCtrl.text.trim(),
+                          orderNumber: numCtrl.text.trim(),
+                          date: dateCtrl.text.trim(),
+                          pdfName: pdfName,
+                          pdfUrl: order?.pdfUrl ?? '',
+                          createdAt: order?.createdAt ?? DateTime.now().toIso8601String(),
+                        );
+                        bool success;
+                        if (order == null) {
+                          success = await context.read<GovernmentOrdersProvider>().addOrder(newOrder, pdfBytes!);
+                          if (success && dialogCtx.mounted) {
+                            await dialogCtx.read<NotificationProvider>().sendSystemNotification(
+                              title: 'New Government Order',
+                              body: newOrder.title,
+                              routingPath: AppRoutes.governmentOrders,
+                            );
+                          }
+                        } else {
+                          success = await context.read<GovernmentOrdersProvider>().updateOrder(newOrder, pdfBytes);
+                        }
                         if (success && dialogCtx.mounted) {
-                          await dialogCtx.read<NotificationProvider>().sendSystemNotification(
-                            title: 'New Government Order',
-                            body: newOrder.title,
-                            routingPath: AppRoutes.governmentOrders,
+                          Navigator.pop(dialogCtx);
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error saving: $e')),
                           );
                         }
-                      } else {
-                        success = await context.read<GovernmentOrdersProvider>().updateOrder(newOrder, pdfBytes);
-                      }
-                      if (success && dialogCtx.mounted) {
-                        Navigator.pop(dialogCtx);
+                      } finally {
+                        if (dialogCtx.mounted) {
+                          setDialogState(() {
+                            isSaving = false;
+                          });
+                        }
                       }
                     }
                   },
-                  child: const Text('Save'),
+                  child: isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Save'),
                 ),
               ],
             );
@@ -2442,15 +2475,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: isSaving ? null : () async {
-                              final result = await FilePicker.platform.pickFiles(
-                                type: FileType.custom,
-                                allowedExtensions: ['pdf'],
-                                withData: true,
-                              );
-                              if (result != null && result.files.single.bytes != null) {
+                              final pickedFile = await pickPdfFile();
+                              if (pickedFile != null) {
                                 setDialogState(() {
-                                  pdfBytes = result.files.single.bytes;
-                                  pdfName = result.files.single.name;
+                                  pdfBytes = pickedFile.bytes;
+                                  pdfName = pickedFile.name;
                                 });
                               }
                             },
@@ -3671,14 +3700,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                               onPressed: isSaving
                                   ? null
                                   : () async {
-                                      final result = await FilePicker.platform.pickFiles(
-                                        type: FileType.video,
-                                        withData: true,
-                                      );
-                                      if (result != null && result.files.single.bytes != null) {
+                                      final pickedFile = await pickVideoFile();
+                                      if (pickedFile != null) {
                                         setDialogState(() {
-                                          videoBytes = result.files.single.bytes;
-                                          videoName = result.files.single.name;
+                                          videoBytes = pickedFile.bytes;
+                                          videoName = pickedFile.name;
                                         });
                                       }
                                     },
@@ -3710,14 +3736,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                               onPressed: isSaving
                                   ? null
                                   : () async {
-                                      final result = await FilePicker.platform.pickFiles(
-                                        type: FileType.image,
-                                        withData: true,
-                                      );
-                                      if (result != null && result.files.single.bytes != null) {
+                                      final pickedFile = await pickImageFile();
+                                      if (pickedFile != null) {
                                         setDialogState(() {
-                                          thumbnailBytes = result.files.single.bytes;
-                                          thumbnailName = result.files.single.name;
+                                          thumbnailBytes = pickedFile.bytes;
+                                          thumbnailName = pickedFile.name;
                                         });
                                       }
                                     },

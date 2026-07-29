@@ -18,6 +18,10 @@ class PushNotificationService {
   /// Initializes the service: requests permission, gets tokens, subscribes to topic,
   /// and listens to background/foreground/terminated notifications.
   Future<void> initialize() async {
+    if (kIsWeb) {
+      debugPrint('PushNotificationService initialization skipped on Web.');
+      return;
+    }
     try {
       // 1. Request notifications permission (important for iOS and Android 13+)
       NotificationSettings settings = await _fcm.requestPermission(
@@ -89,6 +93,10 @@ class PushNotificationService {
     required String body,
     required String routingPath,
   }) async {
+    if (kIsWeb) {
+      debugPrint('PushNotificationService broadcast notification skipped on Web.');
+      return;
+    }
     final client = http.Client();
     try {
       // 1. Load service account credentials

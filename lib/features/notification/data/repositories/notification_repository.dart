@@ -15,6 +15,20 @@ class NotificationRepository {
     return await _firestoreService.getNotifications();
   }
 
+  Future<List<NotificationModel>> getNotificationsPaged({
+    required int limit,
+    String? startAfterCreatedAt,
+  }) async {
+    return await _firestoreService.getNotificationsPaged(
+      limit: limit,
+      startAfterCreatedAt: startAfterCreatedAt,
+    );
+  }
+
+  Future<int> getNotificationsCount() async {
+    return await _firestoreService.getNotificationsCount();
+  }
+
   Future<void> deleteNotification(String id) async {
     await _firestoreService.deleteNotification(id);
   }

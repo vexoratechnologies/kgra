@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/foundation.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/admin_splash_screen.dart';
 import '../../features/auth/presentation/screens/super_admin_splash_screen.dart';
@@ -9,6 +10,7 @@ import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/pending_approval_screen.dart';
 import '../../features/admin/presentation/screens/admin_users_screen.dart';
 import '../../features/home/presentation/screens/main_navigation_wrapper.dart';
+import '../../features/home/presentation/screens/about_screen.dart';
 import '../../features/state_committee/presentation/screens/state_committee_screen.dart';
 import '../../features/meeting_minutes/presentation/screens/meeting_minutes_screen.dart';
 import '../../features/government_orders/presentation/screens/government_orders_screen.dart';
@@ -60,6 +62,7 @@ class AppRoutes {
   static const String formsCirculars = '/forms-circulars';
   static const String updates = '/updates';
   static const String gallery = '/gallery';
+  static const String about = '/about';
   
   // Custom route that is useful for demonstrating the UI/Theme system
   static const String themeDemo = '/theme-demo';
@@ -111,9 +114,21 @@ class AppRoutes {
     );
   }
 
+  static String _determineInitialLocation() {
+    if (kIsWeb) {
+      final host = Uri.base.host.toLowerCase();
+      final path = Uri.base.path.toLowerCase();
+      if (host.contains('superadmin') || path.startsWith('/superadmin')) {
+        return superAdminSplash;
+      }
+      return adminSplash;
+    }
+    return splash;
+  }
+
   /// Global GoRouter instance configuration
   static final GoRouter router = GoRouter(
-    initialLocation: splash,
+    initialLocation: _determineInitialLocation(),
     routes: [
       GoRoute(
         path: splash,
@@ -295,6 +310,14 @@ class AppRoutes {
           context: context,
           state: state,
           child: const GalleryScreen(),
+        ),
+      ),
+      GoRoute(
+        path: about,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          context: context,
+          state: state,
+          child: const AboutScreen(),
         ),
       ),
       GoRoute(

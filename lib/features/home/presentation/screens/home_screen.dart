@@ -1,5 +1,8 @@
+import 'dart:convert' show base64Decode;
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -7,6 +10,7 @@ import '../../../../core/theme/app_text_style.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../ads/presentation/widgets/ad_carousel_widget.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../widgets/upcoming_event_widget.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -114,31 +118,49 @@ class HomeScreen extends StatelessWidget {
       ),
     ];
 
+    final authProvider = context.watch<AuthProvider>();
+    final currentUser = authProvider.currentUser;
+    final userName = currentUser?.name ?? 'Vanessa';
+
     return Scaffold(
       backgroundColor: AppColors.brandBackground,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.brandBackground,
         elevation: 0,
         scrolledUnderElevation: 0,
-        title: Row(
-          children: [
-            // App Branding
-            Text(
-              'KGRA ',
-              style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(
-                fontWeight: FontWeight.w700,
+        toolbarHeight: 90,
+        title: Padding(
+          padding: const EdgeInsets.only(top: 8.0, left: 4.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Hello, $userName',
+                style: GoogleFonts.inter(
+                  color: AppColors.brandSecondary,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-          ],
-        ),
-
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1.0),
-          child: Container(
-            color: Colors.grey.shade100,
-            height: 1.0,
+              const SizedBox(height: 4),
+              Text(
+                'Together for the Profession',
+                style: GoogleFonts.inter(
+                  color: Colors.grey.shade500,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.md, top: 8.0),
+            child: _buildProfileImage(context, authProvider),
+          ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -337,6 +359,82 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildProfileImage(BuildContext context, AuthProvider authProvider) {
+    final profileImageId = authProvider.currentUser?.profileImageId;
+
+    // 1. If it's a Firebase Storage download URL, load directly from Network
+    if (profileImageId != null && profileImageId.startsWith('http')) {
+      return Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: AppColors.brandPrimary.withOpacity(0.2),
+            width: 1.5,
+          ),
+        ),
+        child: ClipOval(
+          child: Image.network(
+            profileImageId,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => _buildDefaultAvatar(),
+          ),
+        ),
+      );
+    }
+
+    // 2. Otherwise, fallback to base64 decoding from local cache / Firestore
+    final base64Image = authProvider.currentUserPhotoBase64;
+    if (base64Image != null && base64Image.isNotEmpty) {
+      try {
+        final decodedBytes = base64Decode(base64Image);
+        return Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: AppColors.brandPrimary.withOpacity(0.2),
+              width: 1.5,
+            ),
+          ),
+          child: ClipOval(
+            child: Image.memory(
+              decodedBytes,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => _buildDefaultAvatar(),
+            ),
+          ),
+        );
+      } catch (e) {
+        debugPrint('Failed to decode user profile image base64: $e');
+      }
+    }
+    
+    return _buildDefaultAvatar();
+  }
+
+  Widget _buildDefaultAvatar() {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: AppColors.brandSecondary.withOpacity(0.06),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: AppColors.brandSecondary.withOpacity(0.1),
+          width: 1,
+        ),
+      ),
+      child: const Icon(
+        Icons.person,
+        color: AppColors.brandPrimary,
+        size: 24,
       ),
     );
   }

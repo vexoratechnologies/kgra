@@ -231,6 +231,7 @@ class AdminProvider extends ChangeNotifier {
 
   /// Lazy-loads user profile image base64 on-demand.
   Future<void> fetchUserImage(String profileImageId, String userUid) async {
+    if (profileImageId.startsWith('http')) return;
     if (_userImages.containsKey(userUid) || _loadingImageUids.contains(userUid)) {
       return;
     }
