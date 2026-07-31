@@ -8,6 +8,7 @@ import '../../../../core/widgets/app_pdf_viewer_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/widgets/compact_app_bar.dart';
 import '../providers/forms_circulars_provider.dart';
 
 class FormsCircularsScreen extends StatefulWidget {
@@ -46,22 +47,17 @@ class _FormsCircularsScreenState extends State<FormsCircularsScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.brandBackground,
-      appBar: AppBar(
-        title: const Text('Forms & Circulars'),
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.brandSecondary,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go(AppRoutes.home);
-            }
-          },
-        ),
+      appBar: CompactAppBar(
+        title: 'Forms & Circulars',
+        subtitle: 'Submit required forms',
+        rightIcon: Icons.description_outlined,
+        onBackTap: () {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go(AppRoutes.home);
+          }
+        },
       ),
       body: SafeArea(
         child: Column(

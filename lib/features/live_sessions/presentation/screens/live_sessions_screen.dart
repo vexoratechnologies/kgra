@@ -9,6 +9,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../providers/live_sessions_provider.dart';
 
+import '../../../../core/widgets/compact_app_bar.dart';
+
 class LiveSessionsScreen extends StatefulWidget {
   const LiveSessionsScreen({super.key});
 
@@ -45,22 +47,17 @@ class _LiveSessionsScreenState extends State<LiveSessionsScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.brandBackground,
-      appBar: AppBar(
-        title: const Text('Live Sessions'),
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.brandSecondary,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go(AppRoutes.home);
-            }
-          },
-        ),
+      appBar: CompactAppBar(
+        title: 'Live Sessions',
+        subtitle: 'Join live, learn together',
+        rightIcon: Icons.event_outlined,
+        onBackTap: () {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go(AppRoutes.home);
+          }
+        },
       ),
       body: SafeArea(
         child: Column(

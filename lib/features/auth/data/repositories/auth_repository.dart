@@ -79,6 +79,12 @@ class AuthRepository {
     await cacheUser(user);
   }
 
+  /// Updates existing user profile details in Firestore and cache.
+  Future<void> updateUser(UserModel user) async {
+    await _firestoreService.saveUser(user);
+    await cacheUser(user);
+  }
+
   /// Saves user image base64 into the database.
   Future<void> saveUserImage(String profileImageId, String imageBase64) async {
     await _firestoreService.saveUserImage(profileImageId, imageBase64);

@@ -12,7 +12,9 @@ import '../../../../core/theme/app_text_style.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../notification/presentation/providers/notification_provider.dart';
 import '../../../notification/presentation/screens/notifications_screen.dart';
+import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/widgets/compact_app_bar.dart';
 import 'home_screen.dart';
 
 class MainNavigationWrapper extends StatefulWidget {
@@ -33,7 +35,7 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
     _screens = [
       const HomeScreen(),
       const NotificationsScreen(showBackButton: false),
-      const _ProfileScreen(),
+      const ProfileScreen(),
       const _MenuScreen(),
     ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -258,226 +260,8 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
 }
 
 
-/// ----------------------------------------------------
-/// Profile Tab Screen
-/// ----------------------------------------------------
-class _ProfileScreen extends StatelessWidget {
-  const _ProfileScreen();
 
-  @override
-  Widget build(BuildContext context) {
-    final authProvider = context.watch<AuthProvider>();
-    final user = authProvider.currentUser;
-    final name = user?.name ?? 'Member';
-    final phone = user?.phoneNumber ?? 'N/A';
-    final designation = user?.designation ?? 'Professional Radiographer';
-    final institution = user?.institution ?? 'Government Hospital';
 
-    return Scaffold(
-      backgroundColor: AppColors.brandBackground,
-      appBar: AppBar(
-        title: Text(
-          'My Profile',
-          style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          children: [
-            const SizedBox(height: AppSpacing.md),
-            // Profile Card Header
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: AppRadius.borderXl,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 15,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                children: [
-                  // Circle Profile Avatar (Firebase Storage URL / Base64 / Initials Fallback)
-                  Builder(
-                    builder: (context) {
-                      Widget? avatarImage;
-                      final profileImageId = user?.profileImageId;
-                      if (profileImageId != null && profileImageId.startsWith('http')) {
-                        avatarImage = Image.network(
-                          profileImageId,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(),
-                        );
-                      } else {
-                        final base64Image = authProvider.currentUserPhotoBase64;
-                        if (base64Image != null && base64Image.isNotEmpty) {
-                          try {
-                            final decodedBytes = base64Decode(base64Image);
-                            avatarImage = Image.memory(
-                              decodedBytes,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(),
-                            );
-                          } catch (_) {}
-                        }
-                      }
-
-                      return Container(
-                        width: 90,
-                        height: 90,
-                        decoration: BoxDecoration(
-                          gradient: avatarImage == null
-                              ? const LinearGradient(
-                                  colors: [Color(0xFF0057B8), Color(0xFF0F4C81)],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                )
-                              : null,
-                          color: avatarImage != null ? Colors.white : null,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.brandPrimary.withValues(alpha: 0.25),
-                              blurRadius: 15,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                          border: avatarImage != null
-                              ? Border.all(
-                                  color: AppColors.brandPrimary.withOpacity(0.15),
-                                  width: 2.0,
-                                )
-                              : null,
-                        ),
-                        child: avatarImage != null
-                            ? ClipOval(child: avatarImage)
-                            : Center(
-                                child: Text(
-                                  name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'M',
-                                  style: const TextStyle(
-                                    fontSize: 36,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F4C81),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.green.shade200, width: 1),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.verified, color: Colors.green.shade700, size: 14),
-                        const SizedBox(width: 4),
-                        Text(
-                          'APPROVED MEMBER',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green.shade800,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: AppSpacing.xxl),
-                  _buildProfileRow(LucideIcons.phone, 'Mobile Number', phone),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildProfileRow(LucideIcons.briefcase, 'Designation', designation),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildProfileRow(LucideIcons.home, 'Institution', institution),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xxl),
-            // Logout Action
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: OutlinedButton.icon(
-                icon: const Icon(LucideIcons.logOut, size: 18),
-                label: const Text('Sign Out Session'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red.shade700,
-                  side: BorderSide(color: Colors.red.shade200, width: 1.5),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: AppRadius.borderLg,
-                  ),
-                ),
-                onPressed: () async {
-                  await authProvider.signOut();
-                  if (context.mounted) {
-                    context.go(AppRoutes.login);
-                  }
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProfileRow(IconData icon, String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, color: const Color(0xFF64748B), size: 20),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF1E293B),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 /// ----------------------------------------------------
 /// Menu / More Tab Screen
@@ -489,16 +273,11 @@ class _MenuScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.brandBackground,
-      appBar: AppBar(
-        title: Text(
-          'Menu',
-          style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
+      appBar: const CompactAppBar(
+        title: 'Menu',
+        subtitle: 'Explore association features',
+        rightIcon: Icons.grid_view_outlined,
+        showBackButton: false,
       ),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),

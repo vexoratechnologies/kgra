@@ -6,6 +6,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_style.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/widgets/compact_app_bar.dart';
 import '../providers/gallery_provider.dart';
 
 class GalleryScreen extends StatefulWidget {
@@ -75,22 +76,17 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.brandBackground,
-      appBar: AppBar(
-        title: const Text('Photo Gallery'),
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.brandSecondary,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go(AppRoutes.home);
-            }
-          },
-        ),
+      appBar: CompactAppBar(
+        title: 'Gallery',
+        subtitle: 'Photos & memories',
+        rightIcon: Icons.photo_library_outlined,
+        onBackTap: () {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go(AppRoutes.home);
+          }
+        },
       ),
       body: SafeArea(
         child: provider.isLoading

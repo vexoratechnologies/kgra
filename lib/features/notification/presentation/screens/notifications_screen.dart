@@ -6,6 +6,7 @@ import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_style.dart';
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/widgets/compact_app_bar.dart';
 import '../providers/notification_provider.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -47,24 +48,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.brandBackground,
-      appBar: AppBar(
-        title: const Text('Notifications'),
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.brandSecondary,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: widget.showBackButton
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () {
-                  if (context.canPop()) {
-                    context.pop();
-                  } else {
-                    context.go(AppRoutes.home);
-                  }
-                },
-              )
-            : null,
+      appBar: CompactAppBar(
+        title: 'Notifications',
+        subtitle: 'Stay updated with alerts',
+        rightIcon: Icons.notifications_outlined,
+        showBackButton: widget.showBackButton,
+        onBackTap: () {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go(AppRoutes.home);
+          }
+        },
       ),
       body: SafeArea(
         child: RefreshIndicator(

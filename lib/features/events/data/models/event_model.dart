@@ -4,6 +4,8 @@ class EventModel {
   final String location;
   final String date; // yyyy-MM-dd
   final String createdAt;
+  final String time;
+  final String link;
 
   const EventModel({
     required this.id,
@@ -11,6 +13,8 @@ class EventModel {
     required this.location,
     required this.date,
     required this.createdAt,
+    this.time = '10:30 AM',
+    this.link = '',
   });
 
   EventModel copyWith({
@@ -19,6 +23,8 @@ class EventModel {
     String? location,
     String? date,
     String? createdAt,
+    String? time,
+    String? link,
   }) {
     return EventModel(
       id: id ?? this.id,
@@ -26,6 +32,8 @@ class EventModel {
       location: location ?? this.location,
       date: date ?? this.date,
       createdAt: createdAt ?? this.createdAt,
+      time: time ?? this.time,
+      link: link ?? this.link,
     );
   }
 
@@ -36,6 +44,8 @@ class EventModel {
       'location': location,
       'date': date,
       'createdAt': createdAt,
+      'time': time,
+      'link': link,
     };
   }
 
@@ -46,12 +56,14 @@ class EventModel {
       location: json['location'] as String? ?? '',
       date: json['date'] as String? ?? '',
       createdAt: json['createdAt'] as String? ?? '',
+      time: json['time'] as String? ?? '10:30 AM',
+      link: json['link'] as String? ?? '',
     );
   }
 
   @override
   String toString() {
-    return 'EventModel(id: $id, title: $title, location: $location, date: $date, createdAt: $createdAt)';
+    return 'EventModel(id: $id, title: $title, location: $location, date: $date, createdAt: $createdAt, time: $time, link: $link)';
   }
 
   @override
@@ -62,11 +74,13 @@ class EventModel {
         other.title == title &&
         other.location == location &&
         other.date == date &&
-        other.createdAt == createdAt;
+        other.createdAt == createdAt &&
+        other.time == time &&
+        other.link == link;
   }
 
   @override
   int get hashCode {
-    return Object.hash(id, title, location, date, createdAt);
+    return Object.hash(id, title, location, date, createdAt, time, link);
   }
 }

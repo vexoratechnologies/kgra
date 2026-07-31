@@ -7,7 +7,10 @@ import '../../../../core/theme/app_text_style.dart';
 import '../../../../core/widgets/app_pdf_viewer_screen.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/widgets/compact_app_bar.dart';
 import '../providers/government_orders_provider.dart';
+import '../../../admin/presentation/providers/admin_provider.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 class GovernmentOrdersScreen extends StatefulWidget {
   const GovernmentOrdersScreen({super.key});
@@ -19,12 +22,15 @@ class GovernmentOrdersScreen extends StatefulWidget {
 class _GovernmentOrdersScreenState extends State<GovernmentOrdersScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  String _selectedSection = 'all';
+  String? _selectedZone;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<GovernmentOrdersProvider>().fetchAllOrders();
+      context.read<AdminProvider>().fetchZones();
     });
   }
 
@@ -34,33 +40,79 @@ class _GovernmentOrdersScreenState extends State<GovernmentOrdersScreen> {
     super.dispose();
   }
 
+  Widget _buildFilterTab(String label, String value) {
+    final isSelected = _selectedSection == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedSection = value;
+          });
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.brandPrimary : Colors.transparent,
+            borderRadius: AppRadius.borderMd,
+            border: Border.all(
+              color: isSelected ? AppColors.brandPrimary : Colors.grey.shade300,
+              width: 1,
+            ),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : AppColors.brandSecondary,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<GovernmentOrdersProvider>();
     final orders = provider.orders;
+
+    final adminProvider = context.watch<AdminProvider>();
+    final zonesList = adminProvider.zones;
+    final userZone = context.watch<AuthProvider>().currentUser?.zone;
+
+    if (_selectedZone == null || !zonesList.contains(_selectedZone)) {
+      if (userZone != null && userZone.isNotEmpty && zonesList.contains(userZone)) {
+        _selectedZone = userZone;
+      } else if (zonesList.isNotEmpty) {
+        _selectedZone = zonesList.first;
+      }
+    }
+
     final filteredOrders = orders.where((o) {
-      return o.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+      final matchesSearch = o.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           o.orderNumber.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesSection = o.section == _selectedSection;
+      final matchesZone = _selectedSection != 'zonal' || o.zone == _selectedZone;
+      return matchesSearch && matchesSection && matchesZone;
     }).toList();
 
     return Scaffold(
       backgroundColor: AppColors.brandBackground,
-      appBar: AppBar(
-        title: const Text('Government Orders'),
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.brandSecondary,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go(AppRoutes.home);
-            }
-          },
-        ),
+      appBar: CompactAppBar(
+        title: 'Government Orders',
+        subtitle: 'Official G.O. documents',
+        rightIcon: Icons.gavel_outlined,
+        onBackTap: () {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go(AppRoutes.home);
+          }
+        },
       ),
       body: SafeArea(
         child: Column(
@@ -84,6 +136,44 @@ class _GovernmentOrdersScreenState extends State<GovernmentOrdersScreen> {
                 ),
               ),
             ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
+              color: Colors.white,
+              child: Row(
+                children: [
+                  _buildFilterTab('All', 'all'),
+                  const SizedBox(width: AppSpacing.sm),
+                  _buildFilterTab('State', 'state'),
+                  const SizedBox(width: AppSpacing.sm),
+                  _buildFilterTab('Zonal', 'zonal'),
+                ],
+              ),
+            ),
+            if (_selectedSection == 'zonal' && zonesList.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
+                color: Colors.white,
+                child: DropdownButtonFormField<String>(
+                  value: _selectedZone,
+                  decoration: InputDecoration(
+                    labelText: 'Filter by Zone',
+                    filled: true,
+                    fillColor: AppColors.brandSecondary.withValues(alpha: 0.03),
+                    border: OutlineInputBorder(
+                      borderRadius: AppRadius.borderMd,
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  items: zonesList.map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() {
+                        _selectedZone = val;
+                      });
+                    }
+                  },
+                ),
+              ),
             Expanded(
               child: provider.isLoading
                   ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))

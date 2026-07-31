@@ -437,6 +437,63 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(false);
   }
 
+  /// Updates existing user profile details in Firestore and local state.
+  Future<bool> updateUserProfile({
+    required String name,
+    String? phoneNumber,
+    String? designation,
+    String? institution,
+    String? photoBase64,
+    String? zone,
+    String? dateOfBirth,
+    String? membershipId,
+    String? dateOfRetirement,
+  }) async {
+    if (_currentUser == null) return false;
+    _setLoading(true);
+    _setError(null);
+    try {
+      String? profileImageId = _currentUser!.profileImageId;
+      if (photoBase64 != null && photoBase64.isNotEmpty) {
+        final downloadUrl = await _uploadProfileImageToStorage(_currentUser!.uid, photoBase64);
+        if (downloadUrl != null) {
+          profileImageId = downloadUrl;
+        } else {
+          profileImageId = 'img_${_currentUser!.uid}';
+          await _authRepository.saveUserImage(profileImageId, photoBase64);
+          _currentUserPhotoBase64 = photoBase64;
+        }
+      }
+
+      final updatedUser = _currentUser!.copyWith(
+        name: name,
+        phoneNumber: phoneNumber ?? _currentUser!.phoneNumber,
+        designation: designation,
+        institution: institution,
+        profileImageId: profileImageId,
+        zone: zone,
+        dateOfBirth: dateOfBirth,
+        membershipId: membershipId,
+        dateOfRetirement: dateOfRetirement,
+      );
+
+      await _authRepository.updateUser(updatedUser);
+      _currentUser = updatedUser;
+      if (photoBase64 != null && photoBase64.isNotEmpty) {
+        _currentUserPhotoBase64 = photoBase64;
+      } else {
+        await _fetchCurrentUserImage();
+      }
+      notifyListeners();
+      _setLoading(false);
+      return true;
+    } catch (e) {
+      _setError('Failed to update profile: ${e.toString()}');
+      _setLoading(false);
+      return false;
+    }
+  }
+
   /// Logs the user out and clears states.
   Future<void> signOut() async {
     _setLoading(true);

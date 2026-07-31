@@ -6,6 +6,8 @@ class GovernmentOrderModel {
   final String pdfName;
   final String pdfUrl;
   final String createdAt;
+  final String section;
+  final String zone;
 
   const GovernmentOrderModel({
     required this.id,
@@ -15,6 +17,8 @@ class GovernmentOrderModel {
     required this.pdfName,
     required this.pdfUrl,
     required this.createdAt,
+    this.section = 'all',
+    this.zone = '',
   });
 
   GovernmentOrderModel copyWith({
@@ -25,6 +29,8 @@ class GovernmentOrderModel {
     String? pdfName,
     String? pdfUrl,
     String? createdAt,
+    String? section,
+    String? zone,
   }) {
     return GovernmentOrderModel(
       id: id ?? this.id,
@@ -34,6 +40,8 @@ class GovernmentOrderModel {
       pdfName: pdfName ?? this.pdfName,
       pdfUrl: pdfUrl ?? this.pdfUrl,
       createdAt: createdAt ?? this.createdAt,
+      section: section ?? this.section,
+      zone: zone ?? this.zone,
     );
   }
 
@@ -46,6 +54,8 @@ class GovernmentOrderModel {
       'pdfName': pdfName,
       'pdfUrl': pdfUrl,
       'createdAt': createdAt,
+      'section': section,
+      'zone': zone,
     };
   }
 
@@ -58,12 +68,14 @@ class GovernmentOrderModel {
       pdfName: json['pdfName'] as String? ?? '',
       pdfUrl: json['pdfUrl'] as String? ?? '',
       createdAt: json['createdAt'] as String? ?? '',
+      section: json['section'] as String? ?? 'all',
+      zone: json['zone'] as String? ?? '',
     );
   }
 
   @override
   String toString() {
-    return 'GovernmentOrderModel(id: $id, title: $title, orderNumber: $orderNumber, date: $date, pdfName: $pdfName, pdfUrl: $pdfUrl, createdAt: $createdAt)';
+    return 'GovernmentOrderModel(id: $id, title: $title, orderNumber: $orderNumber, date: $date, pdfName: $pdfName, pdfUrl: $pdfUrl, createdAt: $createdAt, section: $section, zone: $zone)';
   }
 
   @override
@@ -76,11 +88,13 @@ class GovernmentOrderModel {
         other.date == date &&
         other.pdfName == pdfName &&
         other.pdfUrl == pdfUrl &&
-        other.createdAt == createdAt;
+        other.createdAt == createdAt &&
+        other.section == section &&
+        other.zone == zone;
   }
 
   @override
   int get hashCode {
-    return Object.hash(id, title, orderNumber, date, pdfName, pdfUrl, createdAt);
+    return Object.hash(id, title, orderNumber, date, pdfName, pdfUrl, createdAt, section, zone);
   }
 }

@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../injection.dart';
 import '../services/storage_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/compact_app_bar.dart';
 
 class AppPdfViewerScreen extends StatefulWidget {
   final String title;
@@ -95,15 +96,11 @@ class _AppPdfViewerScreenState extends State<AppPdfViewerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.brandSecondary,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+      backgroundColor: AppColors.brandBackground,
+      appBar: CompactAppBar(
+        title: widget.title,
+        subtitle: 'Document viewer',
+        rightIcon: Icons.picture_as_pdf_outlined,
       ),
       body: _isLoading
           ? const Center(

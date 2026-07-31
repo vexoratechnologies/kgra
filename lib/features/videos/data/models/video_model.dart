@@ -6,6 +6,8 @@ class VideoModel {
   final String thumbnailUrl;
   final int duration; // in seconds
   final String createdAt;
+  final String section;
+  final String zone;
 
   const VideoModel({
     required this.id,
@@ -15,6 +17,8 @@ class VideoModel {
     this.thumbnailUrl = '',
     required this.duration,
     required this.createdAt,
+    this.section = 'all',
+    this.zone = '',
   });
 
   VideoModel copyWith({
@@ -25,6 +29,8 @@ class VideoModel {
     String? thumbnailUrl,
     int? duration,
     String? createdAt,
+    String? section,
+    String? zone,
   }) {
     return VideoModel(
       id: id ?? this.id,
@@ -34,6 +40,8 @@ class VideoModel {
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
       duration: duration ?? this.duration,
       createdAt: createdAt ?? this.createdAt,
+      section: section ?? this.section,
+      zone: zone ?? this.zone,
     );
   }
 
@@ -46,6 +54,8 @@ class VideoModel {
       'thumbnailUrl': thumbnailUrl,
       'duration': duration,
       'createdAt': createdAt,
+      'section': section,
+      'zone': zone,
     };
   }
 
@@ -58,12 +68,14 @@ class VideoModel {
       thumbnailUrl: json['thumbnailUrl'] as String? ?? '',
       duration: json['duration'] as int? ?? 0,
       createdAt: json['createdAt'] as String? ?? '',
+      section: json['section'] as String? ?? 'all',
+      zone: json['zone'] as String? ?? '',
     );
   }
 
   @override
   String toString() {
-    return 'VideoModel(id: $id, title: $title, videoUrl: $videoUrl, thumbnailUrl: $thumbnailUrl, duration: $duration, createdAt: $createdAt)';
+    return 'VideoModel(id: $id, title: $title, videoUrl: $videoUrl, thumbnailUrl: $thumbnailUrl, duration: $duration, createdAt: $createdAt, section: $section, zone: $zone)';
   }
 
   @override
@@ -76,11 +88,13 @@ class VideoModel {
         other.videoUrl == videoUrl &&
         other.thumbnailUrl == thumbnailUrl &&
         other.duration == duration &&
-        other.createdAt == createdAt;
+        other.createdAt == createdAt &&
+        other.section == section &&
+        other.zone == zone;
   }
 
   @override
   int get hashCode {
-    return Object.hash(id, title, description, videoUrl, thumbnailUrl, duration, createdAt);
+    return Object.hash(id, title, description, videoUrl, thumbnailUrl, duration, createdAt, section, zone);
   }
 }

@@ -7,7 +7,10 @@ import '../../../../core/theme/app_text_style.dart';
 import '../../../../core/widgets/app_pdf_viewer_screen.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/widgets/compact_app_bar.dart';
 import '../providers/meeting_minutes_provider.dart';
+import '../../../admin/presentation/providers/admin_provider.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 class MeetingMinutesScreen extends StatefulWidget {
   const MeetingMinutesScreen({super.key});
@@ -19,12 +22,15 @@ class MeetingMinutesScreen extends StatefulWidget {
 class _MeetingMinutesScreenState extends State<MeetingMinutesScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  String _selectedSection = 'all';
+  String? _selectedZone;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<MeetingMinutesProvider>().fetchAllMinutes();
+      context.read<AdminProvider>().fetchZones();
     });
   }
 
@@ -34,32 +40,79 @@ class _MeetingMinutesScreenState extends State<MeetingMinutesScreen> {
     super.dispose();
   }
 
+  Widget _buildFilterTab(String label, String value) {
+    final isSelected = _selectedSection == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedSection = value;
+          });
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.brandPrimary : Colors.transparent,
+            borderRadius: AppRadius.borderMd,
+            border: Border.all(
+              color: isSelected ? AppColors.brandPrimary : Colors.grey.shade300,
+              width: 1,
+            ),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : AppColors.brandSecondary,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<MeetingMinutesProvider>();
     final minutes = provider.minutesList;
+    
+    final adminProvider = context.watch<AdminProvider>();
+    final zonesList = adminProvider.zones;
+    final userZone = context.watch<AuthProvider>().currentUser?.zone;
+
+    if (_selectedZone == null || !zonesList.contains(_selectedZone)) {
+      if (userZone != null && userZone.isNotEmpty && zonesList.contains(userZone)) {
+        _selectedZone = userZone;
+      } else if (zonesList.isNotEmpty) {
+        _selectedZone = zonesList.first;
+      }
+    }
+
     final filteredMinutes = minutes.where((m) {
-      return m.status == 'approved' && m.title.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesStatus = m.status == 'approved';
+      final matchesSearch = m.title.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesSection = m.section == _selectedSection;
+      final matchesZone = _selectedSection != 'zonal' || m.zone == _selectedZone;
+      return matchesStatus && matchesSearch && matchesSection && matchesZone;
     }).toList();
 
     return Scaffold(
       backgroundColor: AppColors.brandBackground,
-      appBar: AppBar(
-        title: const Text('Meeting Minutes'),
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.brandSecondary,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go(AppRoutes.home);
-            }
-          },
-        ),
+      appBar: CompactAppBar(
+        title: 'Meeting Minutes',
+        subtitle: 'Previous meeting records',
+        rightIcon: Icons.assignment_outlined,
+        onBackTap: () {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go(AppRoutes.home);
+          }
+        },
       ),
       body: SafeArea(
         child: Column(
@@ -83,6 +136,44 @@ class _MeetingMinutesScreenState extends State<MeetingMinutesScreen> {
                 ),
               ),
             ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
+              color: Colors.white,
+              child: Row(
+                children: [
+                  _buildFilterTab('All', 'all'),
+                  const SizedBox(width: AppSpacing.sm),
+                  _buildFilterTab('State', 'state'),
+                  const SizedBox(width: AppSpacing.sm),
+                  _buildFilterTab('Zonal', 'zonal'),
+                ],
+              ),
+            ),
+            if (_selectedSection == 'zonal' && zonesList.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
+                color: Colors.white,
+                child: DropdownButtonFormField<String>(
+                  value: _selectedZone,
+                  decoration: InputDecoration(
+                    labelText: 'Filter by Zone',
+                    filled: true,
+                    fillColor: AppColors.brandSecondary.withValues(alpha: 0.03),
+                    border: OutlineInputBorder(
+                      borderRadius: AppRadius.borderMd,
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  items: zonesList.map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() {
+                        _selectedZone = val;
+                      });
+                    }
+                  },
+                ),
+              ),
             Expanded(
               child: provider.isLoading
                   ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))

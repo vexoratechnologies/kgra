@@ -6,6 +6,8 @@ class MeetingMinutesModel {
   final String pdfUrl;
   final String status; // 'pending', 'approved', 'rejected'
   final String createdAt;
+  final String section;
+  final String zone;
 
   const MeetingMinutesModel({
     required this.id,
@@ -15,6 +17,8 @@ class MeetingMinutesModel {
     required this.pdfUrl,
     this.status = 'pending',
     required this.createdAt,
+    this.section = 'all',
+    this.zone = '',
   });
 
   MeetingMinutesModel copyWith({
@@ -25,6 +29,8 @@ class MeetingMinutesModel {
     String? pdfUrl,
     String? status,
     String? createdAt,
+    String? section,
+    String? zone,
   }) {
     return MeetingMinutesModel(
       id: id ?? this.id,
@@ -34,6 +40,8 @@ class MeetingMinutesModel {
       pdfUrl: pdfUrl ?? this.pdfUrl,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
+      section: section ?? this.section,
+      zone: zone ?? this.zone,
     );
   }
 
@@ -46,6 +54,8 @@ class MeetingMinutesModel {
       'pdfUrl': pdfUrl,
       'status': status,
       'createdAt': createdAt,
+      'section': section,
+      'zone': zone,
     };
   }
 
@@ -58,12 +68,14 @@ class MeetingMinutesModel {
       pdfUrl: json['pdfUrl'] as String? ?? '',
       status: json['status'] as String? ?? 'pending',
       createdAt: json['createdAt'] as String? ?? '',
+      section: json['section'] as String? ?? 'all',
+      zone: json['zone'] as String? ?? '',
     );
   }
 
   @override
   String toString() {
-    return 'MeetingMinutesModel(id: $id, title: $title, date: $date, pdfName: $pdfName, pdfUrl: $pdfUrl, status: $status, createdAt: $createdAt)';
+    return 'MeetingMinutesModel(id: $id, title: $title, date: $date, pdfName: $pdfName, pdfUrl: $pdfUrl, status: $status, createdAt: $createdAt, section: $section, zone: $zone)';
   }
 
   @override
@@ -76,11 +88,13 @@ class MeetingMinutesModel {
         other.pdfName == pdfName &&
         other.pdfUrl == pdfUrl &&
         other.status == status &&
-        other.createdAt == createdAt;
+        other.createdAt == createdAt &&
+        other.section == section &&
+        other.zone == zone;
   }
 
   @override
   int get hashCode {
-    return Object.hash(id, title, date, pdfName, pdfUrl, status, createdAt);
+    return Object.hash(id, title, date, pdfName, pdfUrl, status, createdAt, section, zone);
   }
 }

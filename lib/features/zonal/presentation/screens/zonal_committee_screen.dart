@@ -8,6 +8,7 @@ import '../../../../core/theme/app_text_style.dart';
 import '../../../admin/presentation/providers/admin_provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/routes/app_routes.dart';
+import '../../../../core/widgets/compact_app_bar.dart';
 import '../providers/zonal_provider.dart';
 
 /// ZonalCommitteeScreen renders the list of zonal committee members for members.
@@ -59,22 +60,17 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.brandBackground,
-      appBar: AppBar(
-        title: const Text('Zonal Committee'),
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.brandSecondary,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go(AppRoutes.home);
-            }
-          },
-        ),
+      appBar: CompactAppBar(
+        title: 'Zonal Committee',
+        subtitle: 'District & Zonal leaders',
+        rightIcon: Icons.groups_outlined,
+        onBackTap: () {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go(AppRoutes.home);
+          }
+        },
       ),
       body: SafeArea(
         child: Column(

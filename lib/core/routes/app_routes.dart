@@ -26,6 +26,9 @@ import '../../features/zonal/presentation/screens/zonal_committee_screen.dart';
 import '../../features/auth/presentation/screens/admin_login_screen.dart';
 import '../../features/auth/presentation/screens/super_admin_login_screen.dart';
 import '../../features/admin/presentation/screens/super_admin_dashboard.dart';
+import '../../features/profile/presentation/screens/profile_screen.dart';
+import '../../features/profile/presentation/screens/edit_profile_screen.dart';
+import '../widgets/compact_app_bar.dart';
 
 /// AppRoutes defines all navigation routes and transition effects for the application.
 /// 
@@ -48,6 +51,7 @@ class AppRoutes {
   
   static const String home = '/home';
   static const String profile = '/profile';
+  static const String editProfile = '/edit-profile';
   static const String videos = '/videos';
   static const String videoDetails = '/video-details';
   static const String notification = '/notification';
@@ -219,7 +223,15 @@ class AppRoutes {
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           context: context,
           state: state,
-          child: const _PlaceholderScreen(title: 'User Profile'),
+          child: const ProfileScreen(),
+        ),
+      ),
+      GoRoute(
+        path: editProfile,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          context: context,
+          state: state,
+          child: const EditProfileScreen(),
         ),
       ),
       GoRoute(
@@ -373,18 +385,16 @@ class _PlaceholderScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go(AppRoutes.home);
-            }
-          },
-        ),
+      appBar: CompactAppBar(
+        title: title,
+        subtitle: 'KGRA App',
+        onBackTap: () {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go(AppRoutes.home);
+          }
+        },
       ),
       body: Center(
         child: Column(
@@ -427,12 +437,10 @@ class _ThemeDemoScreenState extends State<_ThemeDemoScreen> {
     final theme = Theme.of(context);
     
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Clinical Integrity Style Guide'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go(AppRoutes.splash),
-        ),
+      appBar: CompactAppBar(
+        title: 'Clinical Integrity Style Guide',
+        subtitle: 'Design System & Theme Showcase',
+        onBackTap: () => context.go(AppRoutes.splash),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),

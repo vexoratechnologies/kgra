@@ -13,6 +13,7 @@ import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_style.dart';
 import '../../../../core/widgets/app_pdf_viewer_screen.dart';
+import '../../../../core/widgets/compact_app_bar.dart';
 import '../../../../core/utils/file_picker_helper.dart';
 import '../../../../features/auth/data/models/user_model.dart';
 import '../../../../features/state_committee/presentation/providers/state_committee_provider.dart';
@@ -189,14 +190,16 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       key: _scaffoldKey,
       drawer: !isDesktop ? _buildSidebar(context, isMobile: true) : null,
       appBar: !isDesktop
-          ? AppBar(
-              title: Text(_activeTab),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: _refreshAllData,
-                ),
-              ],
+          ? CompactAppBar(
+              title: _activeTab,
+              subtitle: 'Manage members & approvals',
+              rightIcon: Icons.refresh,
+              onRightTap: _refreshAllData,
+              onBackTap: () {
+                if (_scaffoldKey.currentState != null) {
+                  _scaffoldKey.currentState!.openDrawer();
+                }
+              },
             )
           : null,
       body: Container(
@@ -1740,7 +1743,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Meeting Minutes ArchiveRRR',
+                'Meeting Minutes',
                 style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold),
               ),
               ElevatedButton.icon(
@@ -1800,6 +1803,24 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                                     'Date: ${m.date} | File: ${m.pdfName}',
                                                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                                                     overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: AppColors.brandPrimary.withValues(alpha: 0.1),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Text(
+                                                    m.section == 'zonal' && m.zone.isNotEmpty
+                                                        ? 'ZONAL (${m.zone.toUpperCase()})'
+                                                        : m.section.toUpperCase(),
+                                                    style: const TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: AppColors.brandPrimary,
+                                                    ),
                                                   ),
                                                 ),
                                                 const SizedBox(width: 8),
@@ -1883,6 +1904,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       context: context,
       builder: (dialogCtx) {
         bool isSaving = false;
+        String selectedSection = minutes?.section ?? 'all';
+        String selectedZone = minutes?.zone ?? '';
+        final zonesList = context.read<AdminProvider>().zones;
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
@@ -1897,6 +1921,43 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       decoration: const InputDecoration(labelText: 'Title *'),
                       validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                     ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedSection,
+                      decoration: const InputDecoration(labelText: 'Section *'),
+                      items: const [
+                        DropdownMenuItem(value: 'all', child: Text('All')),
+                        DropdownMenuItem(value: 'state', child: Text('State')),
+                        DropdownMenuItem(value: 'zonal', child: Text('Zonal')),
+                      ],
+                      onChanged: isSaving ? null : (val) {
+                        if (val != null) {
+                          setDialogState(() {
+                            selectedSection = val;
+                          });
+                        }
+                      },
+                    ),
+                    if (selectedSection == 'zonal') ...[
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: selectedZone.isNotEmpty && zonesList.contains(selectedZone)
+                            ? selectedZone
+                            : (zonesList.isNotEmpty ? zonesList.first : null),
+                        decoration: const InputDecoration(labelText: 'Select Zone *'),
+                        items: zonesList.isEmpty
+                            ? []
+                            : zonesList.map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
+                        validator: (v) => selectedSection == 'zonal' && (v == null || v.isEmpty) ? 'Required' : null,
+                        onChanged: isSaving ? null : (val) {
+                          if (val != null) {
+                            setDialogState(() {
+                              selectedZone = val;
+                            });
+                          }
+                        },
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: dateCtrl,
@@ -1972,6 +2033,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                           pdfUrl: minutes?.pdfUrl ?? '',
                           status: minutes?.status ?? 'pending',
                           createdAt: minutes?.createdAt ?? DateTime.now().toIso8601String(),
+                          section: selectedSection,
+                          zone: selectedSection == 'zonal'
+                              ? (selectedZone.isNotEmpty && zonesList.contains(selectedZone)
+                                  ? selectedZone
+                                  : (zonesList.isNotEmpty ? zonesList.first : ''))
+                              : '',
                         );
                         bool success;
                         if (minutes == null) {
@@ -2086,9 +2153,34 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                               style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold, fontSize: 16),
                                             ),
                                             const SizedBox(height: 2),
-                                            Text(
-                                              'Order No: ${o.orderNumber} | Date: ${o.date}',
-                                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    'Order No: ${o.orderNumber} | Date: ${o.date}',
+                                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: AppColors.brandPrimary.withValues(alpha: 0.1),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Text(
+                                                    o.section == 'zonal' && o.zone.isNotEmpty
+                                                        ? 'ZONAL (${o.zone.toUpperCase()})'
+                                                        : o.section.toUpperCase(),
+                                                    style: const TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: AppColors.brandPrimary,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),
@@ -2142,6 +2234,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     String pdfName = order?.pdfName ?? '';
     Uint8List? pdfBytes;
     bool isSaving = false;
+    String selectedSection = order?.section ?? 'all';
+    String selectedZone = order?.zone ?? '';
+    final zonesList = context.read<AdminProvider>().zones;
 
     showDialog(
       context: context,
@@ -2161,6 +2256,43 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                       enabled: !isSaving,
                     ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedSection,
+                      decoration: const InputDecoration(labelText: 'Section *'),
+                      items: const [
+                        DropdownMenuItem(value: 'all', child: Text('All')),
+                        DropdownMenuItem(value: 'state', child: Text('State')),
+                        DropdownMenuItem(value: 'zonal', child: Text('Zonal')),
+                      ],
+                      onChanged: isSaving ? null : (val) {
+                        if (val != null) {
+                          setDialogState(() {
+                            selectedSection = val;
+                          });
+                        }
+                      },
+                    ),
+                    if (selectedSection == 'zonal') ...[
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: selectedZone.isNotEmpty && zonesList.contains(selectedZone)
+                            ? selectedZone
+                            : (zonesList.isNotEmpty ? zonesList.first : null),
+                        decoration: const InputDecoration(labelText: 'Select Zone *'),
+                        items: zonesList.isEmpty
+                            ? []
+                            : zonesList.map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
+                        validator: (v) => selectedSection == 'zonal' && (v == null || v.isEmpty) ? 'Required' : null,
+                        onChanged: isSaving ? null : (val) {
+                          if (val != null) {
+                            setDialogState(() {
+                              selectedZone = val;
+                            });
+                          }
+                        },
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: numCtrl,
@@ -2243,6 +2375,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                           pdfName: pdfName,
                           pdfUrl: order?.pdfUrl ?? '',
                           createdAt: order?.createdAt ?? DateTime.now().toIso8601String(),
+                          section: selectedSection,
+                          zone: selectedSection == 'zonal'
+                              ? (selectedZone.isNotEmpty && zonesList.contains(selectedZone)
+                                  ? selectedZone
+                                  : (zonesList.isNotEmpty ? zonesList.first : ''))
+                              : '',
                         );
                         bool success;
                         if (order == null) {
@@ -3623,12 +3761,36 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                               style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold, fontSize: 16),
                                             ),
                                             const SizedBox(height: 2),
-                                            Text(
-                                              v.duration > 0
-                                                  ? 'Duration: ${(v.duration ~/ 60)}m ${(v.duration % 60)}s | URL: ${v.videoUrl}'
-                                                  : 'URL: ${v.videoUrl}',
-                                              style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                              overflow: TextOverflow.ellipsis,
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    v.duration > 0
+                                                        ? 'Duration: ${(v.duration ~/ 60)}m ${(v.duration % 60)}s | URL: ${v.videoUrl}'
+                                                        : 'URL: ${v.videoUrl}',
+                                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: AppColors.brandPrimary.withValues(alpha: 0.1),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Text(
+                                                    v.section == 'zonal' && v.zone.isNotEmpty
+                                                        ? 'ZONAL (${v.zone.toUpperCase()})'
+                                                        : v.section.toUpperCase(),
+                                                    style: const TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: AppColors.brandPrimary,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),
@@ -3672,6 +3834,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     bool isSaving = false;
     double videoProgress = 0.0;
     double thumbnailProgress = 0.0;
+    String selectedSection = video?.section ?? 'all';
+    String selectedZone = video?.zone ?? '';
+    final zonesList = context.read<AdminProvider>().zones;
 
     showDialog(
       context: context,
@@ -3691,6 +3856,43 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         decoration: const InputDecoration(labelText: 'Title *'),
                         validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                       ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: selectedSection,
+                        decoration: const InputDecoration(labelText: 'Section *'),
+                        items: const [
+                          DropdownMenuItem(value: 'all', child: Text('All')),
+                          DropdownMenuItem(value: 'state', child: Text('State')),
+                          DropdownMenuItem(value: 'zonal', child: Text('Zonal')),
+                        ],
+                        onChanged: isSaving ? null : (val) {
+                          if (val != null) {
+                            setDialogState(() {
+                              selectedSection = val;
+                            });
+                          }
+                        },
+                      ),
+                      if (selectedSection == 'zonal') ...[
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: selectedZone.isNotEmpty && zonesList.contains(selectedZone)
+                              ? selectedZone
+                              : (zonesList.isNotEmpty ? zonesList.first : null),
+                          decoration: const InputDecoration(labelText: 'Select Zone *'),
+                          items: zonesList.isEmpty
+                              ? []
+                              : zonesList.map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
+                          validator: (v) => selectedSection == 'zonal' && (v == null || v.isEmpty) ? 'Required' : null,
+                          onChanged: isSaving ? null : (val) {
+                            if (val != null) {
+                              setDialogState(() {
+                                              selectedZone = val;
+                              });
+                            }
+                          },
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       // Video Selector Row
                       Row(
@@ -3821,6 +4023,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                 thumbnailUrl: video?.thumbnailUrl ?? '',
                                 duration: video?.duration ?? 0,
                                 createdAt: video?.createdAt ?? DateTime.now().toIso8601String(),
+                                section: selectedSection,
+                                zone: selectedSection == 'zonal'
+                                    ? (selectedZone.isNotEmpty && zonesList.contains(selectedZone)
+                                        ? selectedZone
+                                        : (zonesList.isNotEmpty ? zonesList.first : ''))
+                                    : '',
                               );
                               
                               bool success;
@@ -3967,7 +4175,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
-                                              'Date: ${e.date} | Location: ${e.location}',
+                                              'Date: ${e.date} | Time: ${e.time} | Location: ${e.location}',
                                               style: const TextStyle(fontSize: 12, color: Colors.grey),
                                               overflow: TextOverflow.ellipsis,
                                             ),
@@ -4004,6 +4212,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final titleCtrl = TextEditingController(text: event?.title ?? '');
     final locCtrl = TextEditingController(text: event?.location ?? '');
     final dateCtrl = TextEditingController(text: event?.date ?? '');
+    final timeCtrl = TextEditingController(text: event?.time ?? '10:30 AM');
+    final linkCtrl = TextEditingController(text: event?.link ?? '');
 
     showDialog(
       context: context,
@@ -4052,6 +4262,32 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                           }
                         },
                       ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: timeCtrl,
+                        readOnly: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Event Time *',
+                          suffixIcon: Icon(Icons.access_time),
+                        ),
+                        validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                        onTap: () async {
+                          final picked = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.now(),
+                          );
+                          if (picked != null) {
+                            setDialogState(() {
+                              timeCtrl.text = picked.format(context);
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: linkCtrl,
+                        decoration: const InputDecoration(labelText: 'Meeting URL / Link (Optional)'),
+                      ),
                     ],
                   ),
                 ),
@@ -4070,6 +4306,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         location: locCtrl.text.trim(),
                         date: dateCtrl.text.trim(),
                         createdAt: event?.createdAt ?? DateTime.now().toIso8601String(),
+                        time: timeCtrl.text.trim(),
+                        link: linkCtrl.text.trim(),
                       );
                       
                       bool success;

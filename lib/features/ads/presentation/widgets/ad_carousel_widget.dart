@@ -74,27 +74,59 @@ class _AdCarouselWidgetState extends State<AdCarouselWidget> {
 
     if (provider.isLoading) {
       return Container(
-        height: 160,
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        height: 190,
         decoration: BoxDecoration(
           color: Colors.grey.shade100,
-          borderRadius: AppRadius.borderLg,
+          borderRadius: BorderRadius.circular(22),
         ),
-        child: const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary)),
+        child: const Center(child: CircularProgressIndicator(color: Color(0xFF8B1E2D))),
       );
     }
 
-    if (ads.isEmpty) {
-      return const SizedBox.shrink(); // Hide carousel if no ads are available
-    }
+    // Default premium fallback banners if database has no ads
+    final List<AdModel> displayAds = ads.isNotEmpty
+        ? ads
+        : [
+            AdModel(
+              id: 'mock_ad_1',
+              imageUrl: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?q=80&w=600&auto=format&fit=crop',
+              createdAt: DateTime.now().toIso8601String(),
+            ),
+            AdModel(
+              id: 'mock_ad_2',
+              imageUrl: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?q=80&w=600&auto=format&fit=crop',
+              createdAt: DateTime.now().toIso8601String(),
+            ),
+          ];
+
+    final overlayTitles = [
+      'KGRA State Conference',
+      'KGRA Official Portal',
+      'Professional Excellence',
+    ];
+
+    final overlaySubtitles = [
+      'Empowering Kerala Radiographers',
+      'All services & orders in one place',
+      'Together for the Profession',
+    ];
 
     return Column(
       children: [
         Container(
-          height: 160,
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          height: 190,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
           child: ClipRRect(
-            borderRadius: AppRadius.borderLg,
+            borderRadius: BorderRadius.circular(22),
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -105,9 +137,12 @@ class _AdCarouselWidgetState extends State<AdCarouselWidget> {
                       _currentPage = idx;
                     });
                   },
-                  itemCount: ads.length,
+                  itemCount: displayAds.length,
                   itemBuilder: (context, index) {
-                    final ad = ads[index];
+                    final ad = displayAds[index];
+                    final title = overlayTitles[index % overlayTitles.length];
+                    final subtitle = overlaySubtitles[index % overlaySubtitles.length];
+
                     return GestureDetector(
                       onTap: () async {
                         if (ad.targetUrl != null && ad.targetUrl!.trim().isNotEmpty) {
@@ -117,28 +152,115 @@ class _AdCarouselWidgetState extends State<AdCarouselWidget> {
                           }
                         }
                       },
-                      child: _buildAdImage(ad.imageUrl, ad.id),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          // Base Ad Image
+                          _buildAdImage(ad.imageUrl, ad.id),
+                          
+                          // Dark bottom overlay gradient for text legibility
+                          Container(
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.black87,
+                                  Colors.black38,
+                                  Colors.transparent,
+                                ],
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                                stops: [0.0, 0.4, 0.95],
+                              ),
+                            ),
+                          ),
+
+                          // Text Content
+                          Positioned(
+                            bottom: 20,
+                            left: 20,
+                            right: 20,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  subtitle,
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.85),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     );
                   },
                 ),
+
+                // Logo Overlay in top-right corner
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.9),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(2.0),
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/icon/kgra.jpeg',
+                          fit: BoxFit.cover,
+                          errorBuilder: (c, e, s) => const Icon(
+                            Icons.admin_panel_settings,
+                            color: Color(0xFF8B1E2D),
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
                 // Indicator dots overlay
                 Positioned(
-                  bottom: 8,
-                  left: 0,
-                  right: 0,
+                  bottom: 12,
+                  right: 20,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: List.generate(
-                      ads.length,
-                      (index) => Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        width: 8,
-                        height: 8,
+                      displayAds.length,
+                      (index) => AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        width: _currentPage == index ? 16 : 6,
+                        height: 6,
                         decoration: BoxDecoration(
-                          shape: BoxShape.circle,
+                          borderRadius: BorderRadius.circular(3),
                           color: _currentPage == index
-                              ? AppColors.brandPrimary
-                              : Colors.white.withValues(alpha: 0.5),
+                              ? Colors.white
+                              : Colors.white.withOpacity(0.4),
                         ),
                       ),
                     ),

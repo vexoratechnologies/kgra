@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/compact_app_bar.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/video_model.dart';
@@ -153,11 +154,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        title: Text(widget.video.title),
+      backgroundColor: AppColors.brandBackground,
+      appBar: CompactAppBar(
+        title: widget.video.title,
+        subtitle: 'Learn from experts',
+        rightIcon: Icons.play_circle_outline,
       ),
       body: SafeArea(
         child: Column(
