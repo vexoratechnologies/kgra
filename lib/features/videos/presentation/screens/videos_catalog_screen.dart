@@ -88,7 +88,7 @@ class _VideosCatalogScreenState extends State<VideosCatalogScreen> {
     }
 
     final filteredVideos = videos.where((v) {
-      final matchesSection = v.section == _selectedSection;
+      final matchesSection = _selectedSection == 'all' || v.section == _selectedSection;
       final matchesZone = _selectedSection != 'zonal' || v.zone == _selectedZone;
       return matchesSection && matchesZone;
     }).toList();
@@ -116,9 +116,11 @@ class _VideosCatalogScreenState extends State<VideosCatalogScreen> {
               child: Row(
                 children: [
                   _buildFilterTab('All', 'all'),
-                  const SizedBox(width: AppSpacing.sm),
+                  const SizedBox(width: AppSpacing.xs),
                   _buildFilterTab('State', 'state'),
-                  const SizedBox(width: AppSpacing.sm),
+                  const SizedBox(width: AppSpacing.xs),
+                  _buildFilterTab('Executive', 'executive'),
+                  const SizedBox(width: AppSpacing.xs),
                   _buildFilterTab('Zonal', 'zonal'),
                 ],
               ),

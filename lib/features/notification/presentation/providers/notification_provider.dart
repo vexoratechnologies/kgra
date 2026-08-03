@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/push_notification_service.dart';
 import '../../data/models/notification_model.dart';
 import '../../data/repositories/notification_repository.dart';
 
@@ -105,13 +106,13 @@ class NotificationProvider extends ChangeNotifier {
     }
   }
 
-  /// Automatically generates and saves a notification to Firestore.
-  /// This is used to create alerts when new content is added by admins.
+  /// Automatically generates and saves a notification to Firestore and broadcasts FCM push alert.
   Future<bool> sendSystemNotification({
     required String title,
     required String body,
     required String routingPath,
   }) async {
+    print('🔔 [NotificationProvider] sendSystemNotification: "$title"');
     final notification = NotificationModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: title,
@@ -119,6 +120,15 @@ class NotificationProvider extends ChangeNotifier {
       routingPath: routingPath,
       createdAt: DateTime.now().toIso8601String(),
     );
+    try {
+      await PushNotificationService.instance.sendBroadcastNotification(
+        title: title,
+        body: body,
+        routingPath: routingPath,
+      );
+    } catch (e) {
+      print('❌ Error triggering FCM broadcast push notification: $e');
+    }
     return await addNotification(notification);
   }
 }

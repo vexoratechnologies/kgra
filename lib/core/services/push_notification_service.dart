@@ -93,10 +93,7 @@ class PushNotificationService {
     required String body,
     required String routingPath,
   }) async {
-    if (kIsWeb) {
-      debugPrint('PushNotificationService broadcast notification skipped on Web.');
-      return;
-    }
+    print('🚀 [PushNotificationService] Triggering FCM broadcast push for: "$title"');
     final client = http.Client();
     try {
       // 1. Load service account credentials
@@ -113,7 +110,7 @@ class PushNotificationService {
       );
 
       final accessToken = credentials.accessToken.data;
-      debugPrint('Successfully generated OAuth2 Access Token for FCM v1.');
+      print('🔑 [PushNotificationService] OAuth2 Access Token generated successfully.');
 
       // 4. Send the POST request to the FCM v1 endpoint
       final response = await client.post(
@@ -138,9 +135,9 @@ class PushNotificationService {
           },
         ),
       );
-      debugPrint('FCM v1 send response: status=${response.statusCode}, body=${response.body}');
+      print('📡 [PushNotificationService] FCM v1 send response: status=${response.statusCode}, body=${response.body}');
     } catch (e) {
-      debugPrint('Error sending FCM v1 HTTP push notification: $e');
+      print('❌ [PushNotificationService] Error sending FCM v1 HTTP push notification: $e');
     } finally {
       client.close();
     }

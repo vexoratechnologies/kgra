@@ -15,8 +15,24 @@ class AdminRepository {
   }
 
   /// Updates status and approval status for user.
-  Future<void> updateUserStatus(String uid, String status, bool isApproved) async {
-    await _firestoreService.updateUserStatus(uid, status, isApproved);
+  Future<void> updateUserStatus(
+    String uid, 
+    String status, 
+    bool isApproved, {
+    String? reviewedByName,
+    String? reviewedById,
+    String? reviewedAt,
+    String? membershipId,
+  }) async {
+    await _firestoreService.updateUserStatus(
+      uid, 
+      status, 
+      isApproved,
+      reviewedByName: reviewedByName,
+      reviewedById: reviewedById,
+      reviewedAt: reviewedAt,
+      membershipId: membershipId,
+    );
   }
 
   /// Retrieves user image details by profileImageId.
@@ -71,5 +87,9 @@ class AdminRepository {
 
   Future<void> deleteDesignation(String name) async {
     await _firestoreService.deleteDesignation(name);
+  }
+
+  Future<String> generateNextMembershipId(String zone) async {
+    return await _firestoreService.generateNextMembershipId(zone);
   }
 }

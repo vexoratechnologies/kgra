@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../../auth/data/models/admin_model.dart';
 import '../../data/repositories/admin_repository.dart';
@@ -22,12 +23,13 @@ class AdminProvider extends ChangeNotifier {
 
   AdminModel? _currentAdmin;
   List<AdminModel> _admins = [];
-  List<String> _zones = [];
+  List<String> _zones = ['Executive Committee'];
   List<String> _designations = [];
 
   List<UserModel> _pendingUsers = [];
   List<UserModel> _approvedUsers = [];
   List<UserModel> _rejectedUsers = [];
+  String _selectedZoneFilter = 'All Zones';
   bool _isLoading = false;
   String? _error;
 
@@ -39,59 +41,71 @@ class AdminProvider extends ChangeNotifier {
   List<AdminModel> get admins => _admins;
   List<String> get zones => _zones;
   List<String> get designations => _designations;
+  String get selectedZoneFilter => _selectedZoneFilter;
+
+  void setSelectedZoneFilter(String zone) {
+    _selectedZoneFilter = zone;
+    notifyListeners();
+  }
 
   List<UserModel> get pendingUsers {
     debugPrint('pendingUsers called. Total raw users: ${_pendingUsers.length}');
-    if (_currentAdmin != null && _currentAdmin!.role == 'zonal_admin') {
-      final adminZone = _currentAdmin!.zone?.trim().toLowerCase();
-      debugPrint('Filtering pending users for Zonal Admin in zone: "$adminZone"');
-      if (adminZone == null || adminZone.isEmpty || adminZone == 'null') {
-        return _pendingUsers;
-      }
-      final filtered = _pendingUsers.where((u) {
-        final userZone = u.zone?.trim().toLowerCase();
-        final matches = (userZone == adminZone) || (userZone == null || userZone.isEmpty || userZone == 'null');
-        debugPrint('  User: ${u.name}, Zone: "${u.zone}" -> matches: $matches');
-        return matches;
-      }).toList();
-      debugPrint('Filtered pending users count: ${filtered.length}');
-      return filtered;
+    if (_selectedZoneFilter == 'All Zones' || _selectedZoneFilter.isEmpty) {
+      return _pendingUsers;
     }
-    return _pendingUsers;
+    final targetZone = _selectedZoneFilter.trim().toLowerCase();
+    debugPrint('Filtering pending users for selected zone filter: "$targetZone"');
+    final filtered = _pendingUsers.where((u) {
+      final userZone = u.zone?.trim().toLowerCase();
+      if (userZone == null || userZone.isEmpty || userZone == 'null') {
+        return true; // Show users with unassigned zone
+      }
+      final matches = (userZone == targetZone) ||
+          userZone.contains(targetZone) ||
+          targetZone.contains(userZone);
+      debugPrint('  User: ${u.name}, Zone: "${u.zone}" -> matches: $matches');
+      return matches;
+    }).toList();
+    debugPrint('Filtered pending users count: ${filtered.length}');
+    return filtered;
   }
 
   List<UserModel> get approvedUsers {
     debugPrint('approvedUsers called. Total raw users: ${_approvedUsers.length}');
-    if (_currentAdmin != null && _currentAdmin!.role == 'zonal_admin') {
-      final adminZone = _currentAdmin!.zone?.trim().toLowerCase();
-      debugPrint('Filtering approved users for Zonal Admin in zone: "$adminZone"');
-      if (adminZone == null || adminZone.isEmpty || adminZone == 'null') {
-        return _approvedUsers;
-      }
-      final filtered = _approvedUsers.where((u) {
-        final userZone = u.zone?.trim().toLowerCase();
-        final matches = (userZone == adminZone) || (userZone == null || userZone.isEmpty || userZone == 'null');
-        debugPrint('  User: ${u.name}, Zone: "${u.zone}" -> matches: $matches');
-        return matches;
-      }).toList();
-      debugPrint('Filtered approved users count: ${filtered.length}');
-      return filtered;
+    if (_selectedZoneFilter == 'All Zones' || _selectedZoneFilter.isEmpty) {
+      return _approvedUsers;
     }
-    return _approvedUsers;
+    final targetZone = _selectedZoneFilter.trim().toLowerCase();
+    debugPrint('Filtering approved users for selected zone filter: "$targetZone"');
+    final filtered = _approvedUsers.where((u) {
+      final userZone = u.zone?.trim().toLowerCase();
+      if (userZone == null || userZone.isEmpty || userZone == 'null') {
+        return true;
+      }
+      final matches = (userZone == targetZone) ||
+          userZone.contains(targetZone) ||
+          targetZone.contains(userZone);
+      debugPrint('  User: ${u.name}, Zone: "${u.zone}" -> matches: $matches');
+      return matches;
+    }).toList();
+    debugPrint('Filtered approved users count: ${filtered.length}');
+    return filtered;
   }
 
   List<UserModel> get rejectedUsers {
-    if (_currentAdmin != null && _currentAdmin!.role == 'zonal_admin') {
-      final adminZone = _currentAdmin!.zone?.trim().toLowerCase();
-      if (adminZone == null || adminZone.isEmpty || adminZone == 'null') {
-        return _rejectedUsers;
-      }
-      return _rejectedUsers.where((u) {
-        final userZone = u.zone?.trim().toLowerCase();
-        return (userZone == adminZone) || (userZone == null || userZone.isEmpty || userZone == 'null');
-      }).toList();
+    if (_selectedZoneFilter == 'All Zones' || _selectedZoneFilter.isEmpty) {
+      return _rejectedUsers;
     }
-    return _rejectedUsers;
+    final targetZone = _selectedZoneFilter.trim().toLowerCase();
+    return _rejectedUsers.where((u) {
+      final userZone = u.zone?.trim().toLowerCase();
+      if (userZone == null || userZone.isEmpty || userZone == 'null') {
+        return true;
+      }
+      return (userZone == targetZone) ||
+          userZone.contains(targetZone) ||
+          targetZone.contains(userZone);
+    }).toList();
   }
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -175,12 +189,15 @@ class AdminProvider extends ChangeNotifier {
 
   /// Fetches pending registrations from database.
   Future<void> fetchPendingUsers() async {
+    print('🚀 [AdminProvider] fetchPendingUsers() triggered');
     _setLoading(true);
     _setError(null);
     try {
       await _ensureAuthSession();
       _pendingUsers = await _adminRepository.getPendingUsers();
+      print('📥 [AdminProvider] _pendingUsers populated with ${_pendingUsers.length} raw items.');
     } catch (e) {
+      print('❌ [AdminProvider] fetchPendingUsers error: $e');
       _setError('Failed to fetch pending users: ${e.toString()}');
     } finally {
       _setLoading(false);
@@ -191,10 +208,43 @@ class AdminProvider extends ChangeNotifier {
   Future<bool> approveUser(String uid) async {
     _setError(null);
     try {
-      await _adminRepository.updateUserStatus(uid, 'approved', true);
+      final reviewerName = _currentAdmin != null
+          ? (_currentAdmin!.role == 'super_admin' ? 'Super Admin (${_currentAdmin!.username})' : '${_currentAdmin!.username} (Zonal Admin)')
+          : 'Admin';
+      final reviewerId = _currentAdmin?.username ?? 'admin';
+      final reviewedAtStr = DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now());
+
       final userIndex = _pendingUsers.indexWhere((u) => u.uid == uid);
+      String? assignedMembershipId;
       if (userIndex != -1) {
-        final user = _pendingUsers[userIndex].copyWith(status: 'approved', isApproved: true);
+        final pendingUser = _pendingUsers[userIndex];
+        assignedMembershipId = pendingUser.membershipId;
+        if ((assignedMembershipId == null || assignedMembershipId.trim().isEmpty) &&
+            pendingUser.zone != null &&
+            pendingUser.zone!.isNotEmpty) {
+          assignedMembershipId = await _adminRepository.generateNextMembershipId(pendingUser.zone!);
+        }
+      }
+
+      await _adminRepository.updateUserStatus(
+        uid, 
+        'approved', 
+        true,
+        reviewedByName: reviewerName,
+        reviewedById: reviewerId,
+        reviewedAt: reviewedAtStr,
+        membershipId: assignedMembershipId,
+      );
+
+      if (userIndex != -1) {
+        final user = _pendingUsers[userIndex].copyWith(
+          status: 'approved', 
+          isApproved: true,
+          reviewedByName: reviewerName,
+          reviewedById: reviewerId,
+          reviewedAt: reviewedAtStr,
+          membershipId: assignedMembershipId ?? _pendingUsers[userIndex].membershipId,
+        );
         _pendingUsers.removeAt(userIndex);
         _approvedUsers.removeWhere((u) => u.uid == uid);
         _approvedUsers.add(user);
@@ -212,10 +262,29 @@ class AdminProvider extends ChangeNotifier {
   Future<bool> rejectUser(String uid) async {
     _setError(null);
     try {
-      await _adminRepository.updateUserStatus(uid, 'rejected', false);
+      final reviewerName = _currentAdmin != null
+          ? (_currentAdmin!.role == 'super_admin' ? 'Super Admin (${_currentAdmin!.username})' : '${_currentAdmin!.username} (Zonal Admin)')
+          : 'Admin';
+      final reviewerId = _currentAdmin?.username ?? 'admin';
+      final reviewedAtStr = DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now());
+
+      await _adminRepository.updateUserStatus(
+        uid, 
+        'rejected', 
+        false,
+        reviewedByName: reviewerName,
+        reviewedById: reviewerId,
+        reviewedAt: reviewedAtStr,
+      );
       final userIndex = _pendingUsers.indexWhere((u) => u.uid == uid);
       if (userIndex != -1) {
-        final user = _pendingUsers[userIndex].copyWith(status: 'rejected', isApproved: false);
+        final user = _pendingUsers[userIndex].copyWith(
+          status: 'rejected', 
+          isApproved: false,
+          reviewedByName: reviewerName,
+          reviewedById: reviewerId,
+          reviewedAt: reviewedAtStr,
+        );
         _pendingUsers.removeAt(userIndex);
         _rejectedUsers.removeWhere((u) => u.uid == uid);
         _rejectedUsers.add(user);
@@ -298,7 +367,13 @@ class AdminProvider extends ChangeNotifier {
   Future<void> fetchZones() async {
     _setLoading(true);
     try {
-      _zones = await _adminRepository.getZones();
+      final fetched = await _adminRepository.getZones();
+      final list = <String>[];
+      if (!fetched.contains('Executive Committee')) {
+        list.add('Executive Committee');
+      }
+      list.addAll(fetched);
+      _zones = list;
     } catch (e) {
       _setError('Failed to fetch zones: ${e.toString()}');
     } finally {

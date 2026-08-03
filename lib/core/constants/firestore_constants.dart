@@ -22,6 +22,7 @@ class FirestoreCollections {
   static const String ads = 'ADS';
   static const String events = 'EVENTS';
   static const String designations = 'DESIGNATIONS';
+  static const String counters = 'COUNTERS';
 }
 
 /// FirestoreFields holds all field names inside firestore documents to prevent hardcoding.

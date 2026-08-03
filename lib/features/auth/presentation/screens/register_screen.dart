@@ -28,6 +28,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _designationController = TextEditingController();
   final _institutionController = TextEditingController();
   final _dobController = TextEditingController();
+  final _dojController = TextEditingController();
   final _membershipIdController = TextEditingController();
   final _retirementController = TextEditingController();
   String? _selectedZone;
@@ -58,6 +59,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _designationController.dispose();
     _institutionController.dispose();
     _dobController.dispose();
+    _dojController.dispose();
     _membershipIdController.dispose();
     _retirementController.dispose();
     super.dispose();
@@ -91,6 +93,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _handleRegister() async {
+    if (_photoBase64 == null || _photoBase64!.isEmpty) {
+      AppSnackBar.showError(context, 'Profile picture is mandatory. Please select a profile photo.');
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     final name = _nameController.text.trim();
@@ -105,6 +112,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final institution = _institutionController.text.trim();
     final zone = _selectedZone;
     final dob = _dobController.text.trim();
+    final doj = _dojController.text.trim();
     final membershipId = _membershipIdController.text.trim();
     final retirementDate = _retirementController.text.trim();
     final fullPhone = '+91$phone';
@@ -134,6 +142,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       tempPhotoBase64: _photoBase64,
       tempZone: zone,
       tempDateOfBirth: dob,
+      tempDateOfJoin: doj,
       tempMembershipId: membershipId,
       tempDateOfRetirement: retirementDate,
     );
@@ -174,52 +183,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   key: _formKey,
                   child: Column(
                     children: [
-                      // const SizedBox(height: AppSpacing.xxl),
-                  
-                  // // Small logo/brand element
-                  // Center(
-                  //   child: Container(
-                  //     width: 70,
-                  //     height: 70,
-                  //     decoration: BoxDecoration(
-                  //       color: Colors.white,
-                  //       shape: BoxShape.circle,
-                  //       boxShadow: [
-                  //         BoxShadow(
-                  //           color: AppColors.brandSecondary.withValues(alpha: 0.08),
-                  //           blurRadius: 20,
-                  //           offset: const Offset(0, 8),
-                  //         ),
-                  //       ],
-                  //     ),
-                  //     child: const Center(
-                  //       child: Icon(
-                  //         Icons.person_add_outlined,
-                  //         size: 36,
-                  //         color: AppColors.brandPrimary,
-                  //       ),
-                  //     ),
-                  //   ),
-                  // ),
-                  //
-                  // const SizedBox(height: AppSpacing.md),
-                  
-                  // Text(
-                  //   'Create Account',
-                  //   style: AppTextStyle.headlineLgMobile(color: AppColors.brandSecondary).copyWith(
-                  //     fontWeight: FontWeight.w700,
-                  //   ),
-                  // ),
-                  // const SizedBox(height: AppSpacing.xs),
-                  // Text(
-                  //   'Join the Kerala Government Radiographers\' Association',
-                  //   style: AppTextStyle.labelSm(color: AppColors.onSurfaceVariant),
-                  //   textAlign: TextAlign.center,
-                  // ),
-                  //
-                  // const SizedBox(height: AppSpacing.xl),
-                  
-                  // Card
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(AppSpacing.lg),
@@ -255,7 +218,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         
                         const SizedBox(height: AppSpacing.lg),
 
-                        // Photo Picker Widget (Optional)
+                        // Photo Picker Widget (Mandatory)
                         Center(
                           child: Stack(
                             children: [
@@ -299,13 +262,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                         const SizedBox(height: AppSpacing.xs),
                         const Center(
-                          child: Text(
-                            'Profile Photo (Optional)',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.onSurfaceVariant,
-                              fontWeight: FontWeight.w500,
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Profile Photo ',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.onSurfaceVariant,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Text(
+                                '*',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                ' (Mandatory)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: AppSpacing.md),
@@ -376,31 +360,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           },
                         ),
                         
-                        // const SizedBox(height: AppSpacing.lg),
-
-                        // Institution Label & Input
-                        // Text(
-                        //   'Institution',
-                        //   style: AppTextStyle.labelMd(color: AppColors.brandSecondary).copyWith(
-                        //     fontWeight: FontWeight.w600,
-                        //   ),
-                        // ),
-                        // const SizedBox(height: AppSpacing.sm),
-                        // TextFormField(
-                        //   controller: _institutionController,
-                        //   keyboardType: TextInputType.text,
-                        //   decoration: const InputDecoration(
-                        //     hintText: 'Enter your institution/hospital',
-                        //     prefixIcon: Icon(Icons.business_outlined),
-                        //   ),
-                        //   validator: (value) {
-                        //     if (value == null || value.trim().isEmpty) {
-                        //       return 'Institution/Hospital is required';
-                        //     }
-                        //     return null;
-                        //   },
-                        // ),
-                        //
                         const SizedBox(height: AppSpacing.lg),
 
                         // Zone Dropdown Selection
@@ -424,10 +383,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 value: z,
                                 child: Text(z),
                               )).toList(),
-                              onChanged: (val) {
+                              onChanged: (val) async {
                                 setState(() {
                                   _selectedZone = val;
                                 });
+                                if (val != null && val.isNotEmpty) {
+                                  final nextId = await context.read<AuthProvider>().peekNextMembershipId(val);
+                                  if (mounted) {
+                                    _membershipIdController.text = nextId;
+                                  }
+                                }
                               },
                               validator: (value) => value == null ? 'Zone is required' : null,
                             );
@@ -475,6 +440,45 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                         const SizedBox(height: AppSpacing.lg),
 
+                        // Date of Join DatePicker
+                        Text(
+                          'Date of Join',
+                          style: AppTextStyle.labelMd(color: AppColors.brandSecondary).copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        TextFormField(
+                          controller: _dojController,
+                          readOnly: true,
+                          decoration: const InputDecoration(
+                            hintText: 'Select Date of Join',
+                            prefixIcon: Icon(Icons.event_outlined),
+                            suffixIcon: Icon(Icons.calendar_today_outlined),
+                          ),
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: DateTime.now(),
+                              firstDate: DateTime(1950),
+                              lastDate: DateTime.now(),
+                            );
+                            if (picked != null) {
+                              setState(() {
+                                _dojController.text = DateFormat('yyyy-MM-dd').format(picked);
+                              });
+                            }
+                          },
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Date of Join is required';
+                            }
+                            return null;
+                          },
+                        ),
+
+                        const SizedBox(height: AppSpacing.lg),
+
                         // Membership ID Text Field
                         Text(
                           'Membership ID',
@@ -485,14 +489,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         const SizedBox(height: AppSpacing.sm),
                         TextFormField(
                           controller: _membershipIdController,
+                          readOnly: true,
                           keyboardType: TextInputType.text,
                           decoration: const InputDecoration(
-                            hintText: 'Enter your membership ID',
+                            hintText: 'Auto-generated (e.g. KGRATVM/01)',
+                            helperText: 'Auto-assigned sequentially based on selected zone',
                             prefixIcon: Icon(Icons.card_membership_outlined),
                           ),
                           validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Membership ID is required';
+                            if ((value == null || value.trim().isEmpty) && _selectedZone == null) {
+                              return 'Please select a Zone to assign Membership ID';
                             }
                             return null;
                           },

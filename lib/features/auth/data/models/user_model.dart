@@ -15,8 +15,12 @@ class UserModel {
   // Updated fields
   final String? zone;
   final String? dateOfBirth;
+  final String? dateOfJoin;
   final String? membershipId;
   final String? dateOfRetirement;
+  final String? reviewedByName;
+  final String? reviewedById;
+  final String? reviewedAt;
 
   const UserModel({
     required this.uid,
@@ -30,8 +34,12 @@ class UserModel {
     required this.createdAt,
     this.zone,
     this.dateOfBirth,
+    this.dateOfJoin,
     this.membershipId,
     this.dateOfRetirement,
+    this.reviewedByName,
+    this.reviewedById,
+    this.reviewedAt,
   });
 
   /// Creates a copy of the UserModel with replaced fields.
@@ -47,8 +55,12 @@ class UserModel {
     DateTime? createdAt,
     String? zone,
     String? dateOfBirth,
+    String? dateOfJoin,
     String? membershipId,
     String? dateOfRetirement,
+    String? reviewedByName,
+    String? reviewedById,
+    String? reviewedAt,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -62,13 +74,17 @@ class UserModel {
       createdAt: createdAt ?? this.createdAt,
       zone: zone ?? this.zone,
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      dateOfJoin: dateOfJoin ?? this.dateOfJoin,
       membershipId: membershipId ?? this.membershipId,
       dateOfRetirement: dateOfRetirement ?? this.dateOfRetirement,
+      reviewedByName: reviewedByName ?? this.reviewedByName,
+      reviewedById: reviewedById ?? this.reviewedById,
+      reviewedAt: reviewedAt ?? this.reviewedAt,
     );
   }
 
   /// Creates a UserModel instance from a JSON map.
-  factory UserModel.fromJson(Map<String, dynamic> json) {
+  factory UserModel.fromJson(Map<String, dynamic> json, {String? docId}) {
     DateTime parsedDate;
     final rawCreatedAt = json['createdAt'];
     if (rawCreatedAt == null) {
@@ -84,8 +100,11 @@ class UserModel {
       }
     }
 
+    final rawUid = json['uid']?.toString() ?? '';
+    final effectiveUid = rawUid.isNotEmpty ? rawUid : (docId ?? '');
+
     return UserModel(
-      uid: json['uid'] as String? ?? '',
+      uid: effectiveUid,
       name: json['name'] as String? ?? '',
       phoneNumber: json['phoneNumber'] as String? ?? '',
       designation: json['designation'] as String?,
@@ -96,8 +115,12 @@ class UserModel {
       createdAt: parsedDate,
       zone: json['zone'] as String?,
       dateOfBirth: json['dateOfBirth'] as String?,
+      dateOfJoin: json['dateOfJoin'] as String?,
       membershipId: json['membershipId'] as String?,
       dateOfRetirement: json['dateOfRetirement'] as String?,
+      reviewedByName: json['reviewedByName'] as String?,
+      reviewedById: json['reviewedById'] as String?,
+      reviewedAt: json['reviewedAt'] as String?,
     );
   }
 
@@ -115,14 +138,18 @@ class UserModel {
       'createdAt': createdAt.toIso8601String(),
       'zone': zone,
       'dateOfBirth': dateOfBirth,
+      'dateOfJoin': dateOfJoin,
       'membershipId': membershipId,
       'dateOfRetirement': dateOfRetirement,
+      'reviewedByName': reviewedByName,
+      'reviewedById': reviewedById,
+      'reviewedAt': reviewedAt,
     };
   }
 
   @override
   String toString() {
-    return 'UserModel(uid: $uid, name: $name, phoneNumber: $phoneNumber, designation: $designation, institution: $institution, profileImageId: $profileImageId, isApproved: $isApproved, status: $status, createdAt: $createdAt, zone: $zone, dateOfBirth: $dateOfBirth, membershipId: $membershipId, dateOfRetirement: $dateOfRetirement)';
+    return 'UserModel(uid: $uid, name: $name, phoneNumber: $phoneNumber, designation: $designation, institution: $institution, profileImageId: $profileImageId, isApproved: $isApproved, status: $status, createdAt: $createdAt, zone: $zone, dateOfBirth: $dateOfBirth, dateOfJoin: $dateOfJoin, membershipId: $membershipId, dateOfRetirement: $dateOfRetirement, reviewedByName: $reviewedByName, reviewedById: $reviewedById, reviewedAt: $reviewedAt)';
   }
 
   @override
@@ -141,8 +168,12 @@ class UserModel {
       other.createdAt == createdAt &&
       other.zone == zone &&
       other.dateOfBirth == dateOfBirth &&
+      other.dateOfJoin == dateOfJoin &&
       other.membershipId == membershipId &&
-      other.dateOfRetirement == dateOfRetirement;
+      other.dateOfRetirement == dateOfRetirement &&
+      other.reviewedByName == reviewedByName &&
+      other.reviewedById == reviewedById &&
+      other.reviewedAt == reviewedAt;
   }
 
   @override
@@ -158,7 +189,11 @@ class UserModel {
       createdAt.hashCode ^
       zone.hashCode ^
       dateOfBirth.hashCode ^
+      dateOfJoin.hashCode ^
       membershipId.hashCode ^
-      dateOfRetirement.hashCode;
+      dateOfRetirement.hashCode ^
+      reviewedByName.hashCode ^
+      reviewedById.hashCode ^
+      reviewedAt.hashCode;
   }
 }

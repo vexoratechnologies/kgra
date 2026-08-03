@@ -61,8 +61,8 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
     return Scaffold(
       backgroundColor: AppColors.brandBackground,
       appBar: CompactAppBar(
-        title: 'Zonal Committee',
-        subtitle: 'District & Zonal leaders',
+        title: 'Committee Members',
+        subtitle: 'Executive & Zonal leaders',
         rightIcon: Icons.groups_outlined,
         onBackTap: () {
           if (context.canPop()) {
@@ -82,7 +82,7 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
               child: Row(
                 children: [
                   Text(
-                    'Select Zone: ',
+                    'Select Zone / Committee: ',
                     style: AppTextStyle.bodySm().copyWith(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(width: AppSpacing.sm),

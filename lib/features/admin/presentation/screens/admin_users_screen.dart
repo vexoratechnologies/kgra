@@ -69,7 +69,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       }
       final currentAdmin = adminProvider.currentAdmin;
       if (!mounted) return;
-      if (currentAdmin == null || currentAdmin.role != 'zonal_admin') {
+      if (currentAdmin == null || (currentAdmin.role != 'zonal_admin' && currentAdmin.role != 'super_admin')) {
         adminProvider.logoutAdmin();
         context.go(AppRoutes.adminLogin);
       } else {
@@ -992,31 +992,70 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1200),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (val) => setState(() => _searchQuery = val),
-                decoration: InputDecoration(
-                  hintText: 'Search by name, phone, designation, or institution...',
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear, size: 18),
-                          onPressed: () {
-                            setState(() {
-                              _searchQuery = '';
-                              _searchController.clear();
-                            });
-                          },
-                        )
-                      : null,
-                  filled: true,
-                  fillColor: AppColors.brandSecondary.withValues(alpha: 0.03),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-                  border: OutlineInputBorder(
-                    borderRadius: AppRadius.borderMd,
-                    borderSide: BorderSide.none,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (val) => setState(() => _searchQuery = val),
+                      decoration: InputDecoration(
+                        hintText: 'Search by name, phone, designation, or institution...',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () {
+                                  setState(() {
+                                    _searchQuery = '';
+                                    _searchController.clear();
+                                  });
+                                },
+                              )
+                            : null,
+                        filled: true,
+                        fillColor: AppColors.brandSecondary.withValues(alpha: 0.03),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                        border: OutlineInputBorder(
+                          borderRadius: AppRadius.borderMd,
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: AppSpacing.md),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.brandSecondary.withValues(alpha: 0.03),
+                      borderRadius: AppRadius.borderMd,
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: adminProvider.selectedZoneFilter,
+                        icon: const Icon(Icons.filter_alt_outlined, size: 18, color: AppColors.brandPrimary),
+                        style: const TextStyle(
+                          color: AppColors.brandSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        onChanged: (val) {
+                          if (val != null) {
+                            adminProvider.setSelectedZoneFilter(val);
+                          }
+                        },
+                        items: [
+                          'All Zones',
+                          ...adminProvider.zones,
+                        ].map((zone) {
+                          return DropdownMenuItem<String>(
+                            value: zone,
+                            child: Text(zone == 'All Zones' ? 'All Zones' : 'Zone: $zone'),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -1226,11 +1265,23 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                           children: [
                                             Expanded(
                                               child: _InfoTile(
+                                                icon: Icons.event_outlined,
+                                                label: 'Date of Join',
+                                                value: user.dateOfJoin ?? 'Not Provided',
+                                              ),
+                                            ),
+                                            Expanded(
+                                              child: _InfoTile(
                                                 icon: Icons.card_membership_outlined,
                                                 label: 'Membership ID',
                                                 value: user.membershipId ?? 'Not Provided',
                                               ),
                                             ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: AppSpacing.md),
+                                        Row(
+                                          children: [
                                             Expanded(
                                               child: _InfoTile(
                                                 icon: Icons.work_off_outlined,
@@ -1238,8 +1289,32 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                                 value: user.dateOfRetirement ?? 'Not Provided',
                                               ),
                                             ),
+                                            const Expanded(child: SizedBox()),
                                           ],
                                         ),
+                                        if (user.reviewedByName != null || user.reviewedById != null || user.reviewedAt != null) ...[
+                                          const SizedBox(height: AppSpacing.md),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: _InfoTile(
+                                                  icon: Icons.verified_user_outlined,
+                                                  label: user.status == 'approved'
+                                                      ? 'Approved By'
+                                                      : (user.status == 'rejected' ? 'Rejected By' : 'Reviewed By'),
+                                                  value: '${user.reviewedByName ?? "Admin"}${user.reviewedById != null ? " (ID: ${user.reviewedById})" : ""}',
+                                                ),
+                                              ),
+                                              Expanded(
+                                                child: _InfoTile(
+                                                  icon: Icons.access_time_outlined,
+                                                  label: 'Reviewed At',
+                                                  value: user.reviewedAt ?? 'Not Provided',
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
                                         const Divider(height: AppSpacing.xl),
                                         Center(
                                           child: Column(
@@ -1928,6 +2003,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       items: const [
                         DropdownMenuItem(value: 'all', child: Text('All')),
                         DropdownMenuItem(value: 'state', child: Text('State')),
+                        DropdownMenuItem(value: 'executive', child: Text('Executive')),
                         DropdownMenuItem(value: 'zonal', child: Text('Zonal')),
                       ],
                       onChanged: isSaving ? null : (val) {
@@ -2263,6 +2339,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       items: const [
                         DropdownMenuItem(value: 'all', child: Text('All')),
                         DropdownMenuItem(value: 'state', child: Text('State')),
+                        DropdownMenuItem(value: 'executive', child: Text('Executive')),
                         DropdownMenuItem(value: 'zonal', child: Text('Zonal')),
                       ],
                       onChanged: isSaving ? null : (val) {
@@ -2749,7 +2826,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Zonal Members Management',
+                'Executive & Zonal Committee Management',
                 style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold),
               ),
               ElevatedButton.icon(
@@ -2760,7 +2837,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                 ),
                 onPressed: () => _showZonalMemberDialog(context),
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add Zonal Member'),
+                label: const Text('Add Committee Member'),
               ),
             ],
           ),
@@ -3863,6 +3940,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         items: const [
                           DropdownMenuItem(value: 'all', child: Text('All')),
                           DropdownMenuItem(value: 'state', child: Text('State')),
+                          DropdownMenuItem(value: 'executive', child: Text('Executive')),
                           DropdownMenuItem(value: 'zonal', child: Text('Zonal')),
                         ],
                         onChanged: isSaving ? null : (val) {

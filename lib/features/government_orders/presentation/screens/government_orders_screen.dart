@@ -95,7 +95,7 @@ class _GovernmentOrdersScreenState extends State<GovernmentOrdersScreen> {
     final filteredOrders = orders.where((o) {
       final matchesSearch = o.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           o.orderNumber.toLowerCase().contains(_searchQuery.toLowerCase());
-      final matchesSection = o.section == _selectedSection;
+      final matchesSection = _selectedSection == 'all' || o.section == _selectedSection;
       final matchesZone = _selectedSection != 'zonal' || o.zone == _selectedZone;
       return matchesSearch && matchesSection && matchesZone;
     }).toList();
@@ -142,9 +142,11 @@ class _GovernmentOrdersScreenState extends State<GovernmentOrdersScreen> {
               child: Row(
                 children: [
                   _buildFilterTab('All', 'all'),
-                  const SizedBox(width: AppSpacing.sm),
+                  const SizedBox(width: AppSpacing.xs),
                   _buildFilterTab('State', 'state'),
-                  const SizedBox(width: AppSpacing.sm),
+                  const SizedBox(width: AppSpacing.xs),
+                  _buildFilterTab('Executive', 'executive'),
+                  const SizedBox(width: AppSpacing.xs),
                   _buildFilterTab('Zonal', 'zonal'),
                 ],
               ),

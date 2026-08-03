@@ -29,6 +29,7 @@ class AuthProvider extends ChangeNotifier {
   String? _tempPhotoBase64;
   String? _tempZone;
   String? _tempDateOfBirth;
+  String? _tempDateOfJoin;
   String? _tempMembershipId;
   String? _tempDateOfRetirement;
   bool _isVerificationCompleted = false;
@@ -69,6 +70,7 @@ class AuthProvider extends ChangeNotifier {
     _tempPhotoBase64 = null;
     _tempZone = null;
     _tempDateOfBirth = null;
+    _tempDateOfJoin = null;
     _tempMembershipId = null;
     _tempDateOfRetirement = null;
     _isVerificationCompleted = false;
@@ -195,6 +197,7 @@ class AuthProvider extends ChangeNotifier {
     String? tempPhotoBase64,
     String? tempZone,
     String? tempDateOfBirth,
+    String? tempDateOfJoin,
     String? tempMembershipId,
     String? tempDateOfRetirement,
   }) async {
@@ -208,6 +211,7 @@ class AuthProvider extends ChangeNotifier {
       _tempPhotoBase64 = tempPhotoBase64;
       _tempZone = tempZone;
       _tempDateOfBirth = tempDateOfBirth;
+      _tempDateOfJoin = tempDateOfJoin;
       _tempMembershipId = tempMembershipId;
       _tempDateOfRetirement = tempDateOfRetirement;
       await _authRepository.sendOtp(phoneNumber);
@@ -247,6 +251,7 @@ class AuthProvider extends ChangeNotifier {
             photoBase64: _tempPhotoBase64,
             zone: _tempZone,
             dateOfBirth: _tempDateOfBirth,
+            dateOfJoin: _tempDateOfJoin,
             membershipId: _tempMembershipId,
             dateOfRetirement: _tempDateOfRetirement,
           );
@@ -300,6 +305,7 @@ class AuthProvider extends ChangeNotifier {
     String? photoBase64,
     String? zone,
     String? dateOfBirth,
+    String? dateOfJoin,
     String? membershipId,
     String? dateOfRetirement,
   }) async {
@@ -316,6 +322,11 @@ class AuthProvider extends ChangeNotifier {
         }
       }
 
+      String? finalMembershipId = membershipId;
+      if ((finalMembershipId == null || finalMembershipId.trim().isEmpty) && zone != null && zone.isNotEmpty) {
+        finalMembershipId = await _authRepository.generateNextMembershipId(zone);
+      }
+
       final newUser = UserModel(
         uid: uid,
         name: fullName,
@@ -328,7 +339,8 @@ class AuthProvider extends ChangeNotifier {
         createdAt: DateTime.now(),
         zone: zone,
         dateOfBirth: dateOfBirth,
-        membershipId: membershipId,
+        dateOfJoin: dateOfJoin,
+        membershipId: finalMembershipId,
         dateOfRetirement: dateOfRetirement,
       );
       await _authRepository.registerUser(newUser);
@@ -348,6 +360,7 @@ class AuthProvider extends ChangeNotifier {
     String? photoBase64,
     String? zone,
     String? dateOfBirth,
+    String? dateOfJoin,
     String? membershipId,
     String? dateOfRetirement,
   }) async {
@@ -371,6 +384,11 @@ class AuthProvider extends ChangeNotifier {
         }
       }
 
+      String? finalMembershipId = membershipId;
+      if ((finalMembershipId == null || finalMembershipId.trim().isEmpty) && zone != null && zone.isNotEmpty) {
+        finalMembershipId = await _authRepository.generateNextMembershipId(zone);
+      }
+
       final newUser = UserModel(
         uid: uid,
         name: fullName,
@@ -383,7 +401,8 @@ class AuthProvider extends ChangeNotifier {
         createdAt: DateTime.now(),
         zone: zone,
         dateOfBirth: dateOfBirth,
-        membershipId: membershipId,
+        dateOfJoin: dateOfJoin,
+        membershipId: finalMembershipId,
         dateOfRetirement: dateOfRetirement,
       );
 
@@ -446,6 +465,7 @@ class AuthProvider extends ChangeNotifier {
     String? photoBase64,
     String? zone,
     String? dateOfBirth,
+    String? dateOfJoin,
     String? membershipId,
     String? dateOfRetirement,
   }) async {
@@ -473,6 +493,7 @@ class AuthProvider extends ChangeNotifier {
         profileImageId: profileImageId,
         zone: zone,
         dateOfBirth: dateOfBirth,
+        dateOfJoin: dateOfJoin,
         membershipId: membershipId,
         dateOfRetirement: dateOfRetirement,
       );
@@ -507,5 +528,15 @@ class AuthProvider extends ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+
+  /// Read-only preview of next membership ID for a zone.
+  Future<String> peekNextMembershipId(String zone) async {
+    return await _authRepository.peekNextMembershipId(zone);
+  }
+
+  /// Generates the next membership ID for a zone using atomic transaction.
+  Future<String> generateNextMembershipId(String zone) async {
+    return await _authRepository.generateNextMembershipId(zone);
   }
 }

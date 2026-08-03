@@ -127,4 +127,14 @@ class AuthRepository {
     await clearUserCache();
     await _authService.signOut();
   }
+
+  /// Read-only preview of the next membership ID for a zone.
+  Future<String> peekNextMembershipId(String zone) async {
+    return await _firestoreService.peekNextMembershipId(zone);
+  }
+
+  /// Atomically generates the next membership ID for a zone.
+  Future<String> generateNextMembershipId(String zone) async {
+    return await _firestoreService.generateNextMembershipId(zone);
+  }
 }

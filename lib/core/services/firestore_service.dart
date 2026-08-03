@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../constants/firestore_constants.dart';
 import '../../features/auth/data/models/user_model.dart';
@@ -38,7 +39,7 @@ class FirestoreService {
       return null;
     }
 
-    return UserModel.fromJson(querySnapshot.docs.first.data());
+    return UserModel.fromJson(querySnapshot.docs.first.data(), docId: querySnapshot.docs.first.id);
   }
 
   /// Saves a UserModel inside the USERS collection.
@@ -60,7 +61,7 @@ class FirestoreService {
       return null;
     }
 
-    return UserModel.fromJson(docSnapshot.data()!);
+    return UserModel.fromJson(docSnapshot.data()!, docId: docSnapshot.id);
   }
 
   /// Checks if a phone number is registered.
@@ -110,36 +111,124 @@ class FirestoreService {
 
   /// Retrieves all users with 'pending' status.
   Future<List<UserModel>> getPendingUsers() async {
-    final querySnapshot = await _firestore
+    print('====================================================');
+    print('🔍 [FirestoreService] getPendingUsers() started');
+    print('📂 Target Collection: "${FirestoreCollections.users}"');
+    
+    try {
+      final querySnapshot = await _firestore
+          .collection(FirestoreCollections.users)
+          .where(FirestoreFields.status, isEqualTo: 'pending')
+          .get();
+
+      print('🔎 Direct Query where(status == "pending") returned ${querySnapshot.docs.length} docs.');
+      for (var doc in querySnapshot.docs) {
+        print('   -> Doc ID: ${doc.id}, Data: ${doc.data()}');
+      }
+
+      if (querySnapshot.docs.isNotEmpty) {
+        final users = querySnapshot.docs
+            .map((doc) => UserModel.fromJson(doc.data(), docId: doc.id))
+            .toList();
+        print('✅ Returning ${users.length} pending users from direct query.');
+        return users;
+      }
+    } catch (e) {
+      print('⚠️ getPendingUsers direct query error: $e');
+    }
+
+    // Fallback: fetch all user documents and filter in memory to catch casing/whitespace differences or missing status
+    print('🔄 Fallback: Fetching ALL documents from "${FirestoreCollections.users}" collection...');
+    final allDocsSnapshot = await _firestore
         .collection(FirestoreCollections.users)
-        .where(FirestoreFields.status, isEqualTo: 'pending')
         .get();
 
-    return querySnapshot.docs
-        .map((doc) => UserModel.fromJson(doc.data()))
+    print('📊 Total raw documents found in "${FirestoreCollections.users}": ${allDocsSnapshot.docs.length}');
+    for (var doc in allDocsSnapshot.docs) {
+      final data = doc.data();
+      print('   📄 Doc [${doc.id}]: name="${data['name']}", status="${data['status']}", isApproved=${data['isApproved']}, zone="${data['zone']}", phone="${data['phoneNumber']}"');
+    }
+
+    final filteredUsers = allDocsSnapshot.docs
+        .map((doc) => UserModel.fromJson(doc.data(), docId: doc.id))
+        .where((user) {
+          final s = user.status.trim().toLowerCase();
+          final isPending = (s == 'pending' || s.isEmpty || !user.isApproved) &&
+                 s != 'approved' &&
+                 s != 'rejected';
+          print('   🔍 Filter evaluation for ${user.name} (${user.uid}): status="${user.status}", isApproved=${user.isApproved} -> match: $isPending');
+          return isPending;
+        })
         .toList();
+
+    print('✅ Fallback returning ${filteredUsers.length} pending users.');
+    print('====================================================');
+    return filteredUsers;
   }
 
   /// Updates status and approval flag of a user request.
-  Future<void> updateUserStatus(String uid, String status, bool isApproved) async {
+  Future<void> updateUserStatus(
+    String uid, 
+    String status, 
+    bool isApproved, {
+    String? reviewedByName,
+    String? reviewedById,
+    String? reviewedAt,
+    String? membershipId,
+  }) async {
+    final Map<String, dynamic> data = {
+      FirestoreFields.status: status,
+      FirestoreFields.isApproved: isApproved,
+    };
+    if (reviewedByName != null) data['reviewedByName'] = reviewedByName;
+    if (reviewedById != null) data['reviewedById'] = reviewedById;
+    if (reviewedAt != null) data['reviewedAt'] = reviewedAt;
+    if (membershipId != null && membershipId.isNotEmpty) data['membershipId'] = membershipId;
+
     await _firestore
         .collection(FirestoreCollections.users)
         .doc(uid)
-        .update({
-          FirestoreFields.status: status,
-          FirestoreFields.isApproved: isApproved,
-        });
+        .update(data);
   }
 
   /// Retrieves all users with a specific status.
   Future<List<UserModel>> getUsersByStatus(String status) async {
-    final querySnapshot = await _firestore
+    final targetStatus = status.trim().toLowerCase();
+    try {
+      final querySnapshot = await _firestore
+          .collection(FirestoreCollections.users)
+          .where(FirestoreFields.status, isEqualTo: status)
+          .get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        return querySnapshot.docs
+            .map((doc) => UserModel.fromJson(doc.data(), docId: doc.id))
+            .toList();
+      }
+    } catch (e) {
+      print('getUsersByStatus direct query error: $e');
+    }
+
+    // Fallback: fetch all user documents and filter flexibly in memory
+    final allDocsSnapshot = await _firestore
         .collection(FirestoreCollections.users)
-        .where(FirestoreFields.status, isEqualTo: status)
         .get();
 
-    return querySnapshot.docs
-        .map((doc) => UserModel.fromJson(doc.data()))
+    return allDocsSnapshot.docs
+        .map((doc) => UserModel.fromJson(doc.data(), docId: doc.id))
+        .where((user) {
+          final s = user.status.trim().toLowerCase();
+          if (targetStatus == 'approved') {
+            return s == 'approved' || user.isApproved;
+          } else if (targetStatus == 'rejected') {
+            return s == 'rejected';
+          } else if (targetStatus == 'pending') {
+            return (s == 'pending' || s.isEmpty || !user.isApproved) &&
+                   s != 'approved' &&
+                   s != 'rejected';
+          }
+          return s == targetStatus;
+        })
         .toList();
   }
 
@@ -257,10 +346,14 @@ class FirestoreService {
         .collection(FirestoreCollections.zones)
         .orderBy('createdAt', descending: true)
         .get();
-    return querySnapshot.docs
+    final list = querySnapshot.docs
         .map((doc) => doc.data()['name'] as String? ?? '')
         .where((name) => name.isNotEmpty)
         .toList();
+    if (!list.contains('Executive Committee')) {
+      list.insert(0, 'Executive Committee');
+    }
+    return list;
   }
 
   Future<void> deleteZone(String name) async {
@@ -576,5 +669,150 @@ class FirestoreService {
         .collection(FirestoreCollections.events)
         .doc(id)
         .delete();
+  }
+
+  // ==========================================
+  // Membership ID Counter & Prefix Management
+  // ==========================================
+
+  /// Returns the zone prefix and short code for a given zone name.
+  /// E.g. "Trivandrum" -> { code: 'TVM', prefix: 'KGRATVM/' }
+  static Map<String, String> getZoneDetails(String? zone) {
+    if (zone == null || zone.trim().isEmpty) {
+      return {'code': 'GEN', 'prefix': 'KGRA/'};
+    }
+    final clean = zone.trim().toLowerCase();
+    String code;
+    if (clean.contains('trivandrum') || clean.contains('thiruvananthapuram') || clean == 'tvm') {
+      code = 'TVM';
+    } else if (clean.contains('kollam') || clean == 'klm') {
+      code = 'KLM';
+    } else if (clean.contains('pathanamthitta') || clean == 'pta') {
+      code = 'PTA';
+    } else if (clean.contains('alappuzha') || clean == 'alp') {
+      code = 'ALP';
+    } else if (clean.contains('kottayam') || clean == 'ktm') {
+      code = 'KTM';
+    } else if (clean.contains('idukki') || clean == 'idk') {
+      code = 'IDK';
+    } else if (clean.contains('ernakulam') || clean.contains('kochi') || clean == 'ekm') {
+      code = 'EKM';
+    } else if (clean.contains('thrissur') || clean == 'tcr') {
+      code = 'TCR';
+    } else if (clean.contains('palakkad') || clean == 'pkd') {
+      code = 'PKD';
+    } else if (clean.contains('malappuram') || clean == 'mpm') {
+      code = 'MPM';
+    } else if (clean.contains('kozhikode') || clean == 'kkd') {
+      code = 'KKD';
+    } else if (clean.contains('wayanad') || clean == 'wyd') {
+      code = 'WYD';
+    } else if (clean.contains('kannur') || clean == 'knr') {
+      code = 'KNR';
+    } else if (clean.contains('kasaragod') || clean == 'ksd') {
+      code = 'KSD';
+    } else {
+      final alphaOnly = zone.replaceAll(RegExp(r'[^a-zA-Z]'), '').toUpperCase();
+      if (alphaOnly.length >= 3) {
+        code = alphaOnly.substring(0, 3);
+      } else if (alphaOnly.isNotEmpty) {
+        code = alphaOnly.padRight(3, 'X');
+      } else {
+        code = 'GEN';
+      }
+    }
+    return {'code': code, 'prefix': 'KGRA$code/'};
+  }
+
+  /// Read-only preview of the next membership ID for a zone without incrementing.
+  Future<String> peekNextMembershipId(String zone) async {
+    final details = getZoneDetails(zone);
+    final code = details['code']!;
+    final prefix = details['prefix']!;
+
+    try {
+      final docSnapshot = await _firestore
+          .collection(FirestoreCollections.counters)
+          .doc('zone_counters')
+          .get();
+
+      int currentCount = 0;
+      if (docSnapshot.exists && docSnapshot.data() != null) {
+        currentCount = (docSnapshot.data()![code] as num?)?.toInt() ?? 0;
+      }
+
+      if (currentCount == 0) {
+        currentCount = await _findMaxMembershipSeqFromUsers(prefix);
+      }
+
+      final nextSeq = currentCount + 1;
+      return '$prefix${nextSeq.toString().padLeft(2, '0')}';
+    } catch (e) {
+      debugPrint('Error peeking next membership ID: $e');
+      final fallbackSeq = (await _findMaxMembershipSeqFromUsers(prefix)) + 1;
+      return '$prefix${fallbackSeq.toString().padLeft(2, '0')}';
+    }
+  }
+
+  /// Atomically increments and returns the next membership ID for a given zone using Firestore Transaction.
+  Future<String> generateNextMembershipId(String zone) async {
+    final details = getZoneDetails(zone);
+    final code = details['code']!;
+    final prefix = details['prefix']!;
+    final docRef = _firestore
+        .collection(FirestoreCollections.counters)
+        .doc('zone_counters');
+
+    try {
+      final nextSeq = await _firestore.runTransaction<int>((transaction) async {
+        final snapshot = await transaction.get(docRef);
+        int currentCount = 0;
+        if (snapshot.exists && snapshot.data() != null) {
+          currentCount = (snapshot.data()![code] as num?)?.toInt() ?? 0;
+        }
+
+        if (currentCount == 0) {
+          currentCount = await _findMaxMembershipSeqFromUsers(prefix);
+        }
+
+        final newCount = currentCount + 1;
+        transaction.set(
+          docRef,
+          {code: newCount},
+          SetOptions(merge: true),
+        );
+        return newCount;
+      });
+
+      return '$prefix${nextSeq.toString().padLeft(2, '0')}';
+    } catch (e) {
+      debugPrint('Error generating next membership ID in transaction: $e');
+      final fallbackSeq = (await _findMaxMembershipSeqFromUsers(prefix)) + 1;
+      return '$prefix${fallbackSeq.toString().padLeft(2, '0')}';
+    }
+  }
+
+  /// Internal helper to find highest numeric sequence from USERS collection for a zone prefix
+  Future<int> _findMaxMembershipSeqFromUsers(String prefix) async {
+    try {
+      final usersSnap = await _firestore.collection(FirestoreCollections.users).get();
+      int maxNum = 0;
+      final regExp = RegExp(r'(\d+)$');
+      for (final doc in usersSnap.docs) {
+        final memId = doc.data()['membershipId'] as String?;
+        if (memId != null && memId.startsWith(prefix)) {
+          final match = regExp.firstMatch(memId);
+          if (match != null) {
+            final numVal = int.tryParse(match.group(1) ?? '');
+            if (numVal != null && numVal > maxNum) {
+              maxNum = numVal;
+            }
+          }
+        }
+      }
+      return maxNum;
+    } catch (_) {
+      return 0;
+    }
   }
 }

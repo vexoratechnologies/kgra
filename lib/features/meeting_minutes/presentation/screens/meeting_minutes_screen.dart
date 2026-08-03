@@ -95,7 +95,7 @@ class _MeetingMinutesScreenState extends State<MeetingMinutesScreen> {
     final filteredMinutes = minutes.where((m) {
       final matchesStatus = m.status == 'approved';
       final matchesSearch = m.title.toLowerCase().contains(_searchQuery.toLowerCase());
-      final matchesSection = m.section == _selectedSection;
+      final matchesSection = _selectedSection == 'all' || m.section == _selectedSection;
       final matchesZone = _selectedSection != 'zonal' || m.zone == _selectedZone;
       return matchesStatus && matchesSearch && matchesSection && matchesZone;
     }).toList();
@@ -142,9 +142,11 @@ class _MeetingMinutesScreenState extends State<MeetingMinutesScreen> {
               child: Row(
                 children: [
                   _buildFilterTab('All', 'all'),
-                  const SizedBox(width: AppSpacing.sm),
+                  const SizedBox(width: AppSpacing.xs),
                   _buildFilterTab('State', 'state'),
-                  const SizedBox(width: AppSpacing.sm),
+                  const SizedBox(width: AppSpacing.xs),
+                  _buildFilterTab('Executive', 'executive'),
+                  const SizedBox(width: AppSpacing.xs),
                   _buildFilterTab('Zonal', 'zonal'),
                 ],
               ),
