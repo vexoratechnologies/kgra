@@ -336,26 +336,26 @@ class _OtpScreenState extends State<OtpScreen> {
                       const SizedBox(height: AppSpacing.sm),
                       
                       // Change Mobile Number
-                      GestureDetector(
-                        onTap: () {
-                          authProvider.clearStates();
-                          context.go(AppRoutes.login);
-                        },
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.edit, size: 16, color: AppColors.brandPrimary),
-                            SizedBox(width: AppSpacing.xs),
-                            Text(
-                              'Change Mobile Number',
-                              style: TextStyle(
-                                color: AppColors.brandPrimary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      // GestureDetector(
+                      //   onTap: () {
+                      //     authProvider.clearStates();
+                      //     context.go(AppRoutes.login);
+                      //   },
+                      //   child: const Row(
+                      //     mainAxisAlignment: MainAxisAlignment.center,
+                      //     children: [
+                      //       Icon(Icons.edit, size: 16, color: AppColors.brandPrimary),
+                      //       SizedBox(width: AppSpacing.xs),
+                      //       Text(
+                      //         'Change Mobile Number',
+                      //         style: TextStyle(
+                      //           color: AppColors.brandPrimary,
+                      //           fontWeight: FontWeight.w600,
+                      //         ),
+                      //       ),
+                      //     ],
+                      //   ),
+                      // ),
                     ],
                   ),
                 ),

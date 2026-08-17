@@ -5,22 +5,20 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_style.dart';
-import '../../../admin/presentation/providers/admin_provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/widgets/compact_app_bar.dart';
 import '../providers/zonal_provider.dart';
 
-/// ZonalCommitteeScreen renders the list of zonal committee members for members.
-class ZonalCommitteeScreen extends StatefulWidget {
-  const ZonalCommitteeScreen({super.key});
+/// ExecutiveCommitteeScreen renders the list of Executive Committee members.
+class ExecutiveCommitteeScreen extends StatefulWidget {
+  const ExecutiveCommitteeScreen({super.key});
 
   @override
-  State<ZonalCommitteeScreen> createState() => _ZonalCommitteeScreenState();
+  State<ExecutiveCommitteeScreen> createState() => _ExecutiveCommitteeScreenState();
 }
 
-class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
-  String? _selectedZone;
+class _ExecutiveCommitteeScreenState extends State<ExecutiveCommitteeScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -29,7 +27,6 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ZonalProvider>().fetchMembers();
-      context.read<AdminProvider>().fetchZones();
     });
   }
 
@@ -42,29 +39,21 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
   @override
   Widget build(BuildContext context) {
     final zonalProvider = context.watch<ZonalProvider>();
-    final adminProvider = context.watch<AdminProvider>();
     
-    final zones = adminProvider.zones.where((z) => !z.toLowerCase().contains('executive')).toList();
-    
-    // Automatically select 'All' if not selected yet
-    if (_selectedZone == null) {
-      _selectedZone = 'All';
-    }
-
-    final filteredMembers = zonalProvider.members.where((m) {
-      final isNotExec = !m.zone.toLowerCase().contains('executive');
-      final matchesZone = _selectedZone == 'All' || m.zone == _selectedZone;
+    // Filter only members where zone == 'Executive Committee'
+    final execMembers = zonalProvider.members.where((m) {
+      final isExec = m.zone.toLowerCase().contains('executive');
       final matchesQuery = m.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           m.designation.toLowerCase().contains(_searchQuery.toLowerCase());
-      return isNotExec && matchesZone && matchesQuery;
+      return isExec && matchesQuery;
     }).toList();
 
     return Scaffold(
       backgroundColor: AppColors.brandBackground,
       appBar: CompactAppBar(
-        title: 'Zonal Committee',
-        subtitle: 'Zonal office bearers & leaders',
-        rightIcon: Icons.map_outlined,
+        title: 'Executive Committee',
+        subtitle: 'Executive Office Bearers & Committee Leaders',
+        rightIcon: Icons.stars_outlined,
         onBackTap: () {
           if (context.canPop()) {
             context.pop();
@@ -76,31 +65,6 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Zone Selector Dropdown
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-              color: Colors.white,
-              child: Row(
-                children: [
-                  Text(
-                    'Select Zone / Committee: ',
-                    style: AppTextStyle.bodySm().copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _selectedZone,
-                      decoration: const InputDecoration(
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      ),
-                      items: ['All', ...zones].map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
-                      onChanged: (val) => setState(() => _selectedZone = val),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
             // Search Bar
             Container(
               padding: const EdgeInsets.all(AppSpacing.md),
@@ -109,7 +73,7 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
                 controller: _searchController,
                 onChanged: (v) => setState(() => _searchQuery = v),
                 decoration: InputDecoration(
-                  hintText: _selectedZone == 'All' ? 'Search all members...' : 'Search members in this zone...',
+                  hintText: 'Search executive members by name or designation...',
                   prefixIcon: const Icon(Icons.search),
                   filled: true,
                   fillColor: AppColors.brandSecondary.withValues(alpha: 0.03),
@@ -126,7 +90,7 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
                   ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
                   : zonalProvider.error != null
                       ? Center(child: Text(zonalProvider.error!, style: const TextStyle(color: AppColors.error)))
-                      : filteredMembers.isEmpty
+                      : execMembers.isEmpty
                           ? Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -135,8 +99,8 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
                                   const SizedBox(height: 16),
                                   Text(
                                     _searchQuery.isNotEmpty 
-                                        ? 'No members match search' 
-                                        : (_selectedZone == 'All' ? 'No committee members found' : 'No committee members in this zone'),
+                                        ? 'No executive members match search' 
+                                        : 'No executive committee members found',
                                     style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
                                   ),
                                 ],
@@ -144,9 +108,9 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
                             )
                           : ListView.builder(
                               padding: const EdgeInsets.all(AppSpacing.md),
-                              itemCount: filteredMembers.length,
+                              itemCount: execMembers.length,
                               itemBuilder: (context, index) {
-                                final m = filteredMembers[index];
+                                final m = execMembers[index];
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: AppSpacing.md),
                                   decoration: BoxDecoration(

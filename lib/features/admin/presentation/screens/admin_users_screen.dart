@@ -114,7 +114,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       context.read<AdminProvider>().fetchApprovedUsers();
     } else if (label == 'Rejected Requests') {
       context.read<AdminProvider>().fetchRejectedUsers();
-    } else if (label == 'Zonal Committee') {
+    } else if (label == 'Zonal Committee' || label == 'Executive Committee') {
       context.read<ZonalProvider>().fetchMembers();
     } else if (label == 'Meeting Minutes') {
       context.read<MeetingMinutesProvider>().fetchAllMinutes();
@@ -426,6 +426,10 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   label: 'Committee Members',
                 ),
                 _buildSidebarItem(
+                  icon: Icons.stars_outlined,
+                  label: 'Executive Committee',
+                ),
+                _buildSidebarItem(
                   icon: Icons.groups_outlined,
                   label: 'Zonal Committee',
                 ),
@@ -598,7 +602,10 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       case 'Rejected Requests':
         return _buildListView(context, 'rejected');
       case 'Committee Members':
+      case 'State Committee':
         return _buildCommitteeMembersView(context);
+      case 'Executive Committee':
+        return _buildExecutiveCommitteeView(context);
       case 'Zonal Committee':
         return _buildZonalCommitteeView(context);
       case 'Meeting Minutes':
@@ -2810,9 +2817,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     );
   }
 
-  Widget _buildZonalCommitteeView(BuildContext context) {
+  Widget _buildExecutiveCommitteeView(BuildContext context) {
     final provider = context.watch<ZonalProvider>();
-    final members = provider.members;
+    final members = provider.members.where((m) => m.zone.toLowerCase().contains('executive')).toList();
 
     return Column(
       children: [
@@ -2826,7 +2833,126 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Executive & Zonal Committee Management',
+                'Executive Committee Management',
+                style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brandPrimary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: AppRadius.borderMd),
+                ),
+                onPressed: () => _showZonalMemberDialog(context, defaultZone: 'Executive Committee'),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add Executive Member'),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: provider.isLoading
+              ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
+              : provider.error != null
+                  ? Center(child: Text(provider.error!, style: const TextStyle(color: AppColors.error)))
+                  : members.isEmpty
+                      ? const Center(child: Text('No executive committee members found.'))
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(AppSpacing.xl),
+                          itemCount: members.length,
+                          itemBuilder: (context, index) {
+                            final m = members[index];
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                              child: _buildCardWrapper(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(AppSpacing.lg),
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 28,
+                                        backgroundColor: AppColors.brandSecondary.withValues(alpha: 0.06),
+                                        backgroundImage: m.photoBase64 != null
+                                            ? MemoryImage(base64Decode(m.photoBase64!))
+                                            : null,
+                                        child: m.photoBase64 == null
+                                            ? const Icon(Icons.person, color: AppColors.brandPrimary, size: 28)
+                                            : null,
+                                      ),
+                                      const SizedBox(width: AppSpacing.md),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              m.name,
+                                              style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold, fontSize: 16),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              '${m.designation} | Executive Committee',
+                                              style: const TextStyle(
+                                                color: AppColors.brandPrimary,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Row(
+                                              children: [
+                                                const Icon(Icons.phone, size: 12, color: Colors.grey),
+                                                const SizedBox(width: 4),
+                                                Text(m.phoneNumber, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                                const SizedBox(width: AppSpacing.md),
+                                                const Icon(Icons.email, size: 12, color: Colors.grey),
+                                                const SizedBox(width: 4),
+                                                Text(m.email, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.edit, color: Colors.blue),
+                                        onPressed: () => _showZonalMemberDialog(context, member: m, defaultZone: 'Executive Committee'),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete, color: AppColors.error),
+                                        onPressed: () => _confirmDelete(
+                                          context,
+                                          title: 'Delete Member',
+                                          content: 'Are you sure you want to delete ${m.name}?',
+                                          onConfirm: () => provider.deleteMember(m.id),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildZonalCommitteeView(BuildContext context) {
+    final provider = context.watch<ZonalProvider>();
+    final members = provider.members.where((m) => !m.zone.toLowerCase().contains('executive')).toList();
+
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.lg),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(bottom: BorderSide(color: AppColors.brandSecondary.withValues(alpha: 0.04), width: 1)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Zonal Committee Management',
                 style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold),
               ),
               ElevatedButton.icon(
@@ -2837,7 +2963,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                 ),
                 onPressed: () => _showZonalMemberDialog(context),
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add Committee Member'),
+                label: const Text('Add Zonal Member'),
               ),
             ],
           ),
@@ -2929,12 +3055,13 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     );
   }
 
-  void _showZonalMemberDialog(BuildContext context, {ZonalMemberModel? member}) {
+  void _showZonalMemberDialog(BuildContext context, {ZonalMemberModel? member, String? defaultZone}) {
     final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController(text: member?.name ?? '');
     final phoneCtrl = TextEditingController(text: member?.phoneNumber ?? '');
     final emailCtrl = TextEditingController(text: member?.email ?? '');
-    String? selectedZone = member?.zone;
+    final isExecutive = (member?.zone ?? defaultZone ?? '').toLowerCase().contains('executive') || defaultZone == 'Executive Committee';
+    String? selectedZone = isExecutive ? 'Executive Committee' : (member?.zone ?? defaultZone);
     String? photoBase64 = member?.photoBase64;
     final designations = context.read<AdminProvider>().designations;
     String? selectedDesignation = member?.designation;
@@ -2942,9 +3069,10 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       selectedDesignation = designations.first;
     }
 
-    final zones = context.read<AdminProvider>().zones;
-    if (selectedZone == null && zones.isNotEmpty) {
-      selectedZone = zones.first;
+    final rawZones = context.read<AdminProvider>().zones;
+    final availableZonalZones = rawZones.where((z) => !z.toLowerCase().contains('executive')).toList();
+    if (!isExecutive && (selectedZone == null || selectedZone.toLowerCase().contains('executive')) && availableZonalZones.isNotEmpty) {
+      selectedZone = availableZonalZones.first;
     }
 
     showDialog(
@@ -2953,7 +3081,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text(member == null ? 'Add Zonal Member' : 'Update Zonal Member'),
+              title: Text(member == null 
+                  ? (isExecutive ? 'Add Executive Member' : 'Add Zonal Member') 
+                  : (isExecutive ? 'Update Executive Member' : 'Update Zonal Member')),
               content: SingleChildScrollView(
                 child: Form(
                   key: formKey,
@@ -2995,13 +3125,21 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         validator: (v) => v == null ? 'Required' : null,
                       ),
                       const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: selectedZone,
-                        decoration: const InputDecoration(labelText: 'Zone *'),
-                        items: zones.map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
-                        onChanged: (val) => setDialogState(() => selectedZone = val),
-                        validator: (v) => v == null ? 'Required' : null,
-                      ),
+                      if (isExecutive) ...[
+                        TextFormField(
+                          initialValue: 'Executive Committee',
+                          enabled: false,
+                          decoration: const InputDecoration(labelText: 'Committee Section'),
+                        ),
+                      ] else ...[
+                        DropdownButtonFormField<String>(
+                          value: selectedZone,
+                          decoration: const InputDecoration(labelText: 'Zone *'),
+                          items: availableZonalZones.map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
+                          onChanged: (val) => setDialogState(() => selectedZone = val),
+                          validator: (v) => v == null ? 'Required' : null,
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: phoneCtrl,
@@ -3025,13 +3163,14 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     if (formKey.currentState!.validate()) {
+                      final finalZone = isExecutive ? 'Executive Committee' : selectedZone!;
                       final newMember = ZonalMemberModel(
                         id: member?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
                         name: nameCtrl.text.trim(),
                         designation: selectedDesignation ?? '',
                         phoneNumber: phoneCtrl.text.trim(),
                         email: emailCtrl.text.trim(),
-                        zone: selectedZone!,
+                        zone: finalZone,
                         photoBase64: photoBase64,
                         createdAt: member?.createdAt ?? DateTime.now().toIso8601String(),
                       );
@@ -3039,10 +3178,13 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       if (member == null) {
                         success = await context.read<ZonalProvider>().addMember(newMember);
                         if (success && dialogCtx.mounted) {
+                          final isExec = newMember.zone.toLowerCase().contains('executive');
                           await dialogCtx.read<NotificationProvider>().sendSystemNotification(
-                            title: 'New Zonal Committee Member',
-                            body: '${newMember.name} has been added to the Zonal Committee of ${newMember.zone}.',
-                            routingPath: AppRoutes.zonalCommittee,
+                            title: isExec ? 'New Executive Committee Member' : 'New Zonal Committee Member',
+                            body: isExec 
+                                ? '${newMember.name} has been added to the Executive Committee.' 
+                                : '${newMember.name} has been added to the Zonal Committee of ${newMember.zone}.',
+                            routingPath: isExec ? AppRoutes.executiveCommittee : AppRoutes.zonalCommittee,
                           );
                         }
                       } else {

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/routes/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -639,10 +640,72 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ),
                 ),
               ),
+              const SizedBox(height: AppSpacing.md),
+
+              // Delete Profile Button
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFDC2626), width: 1.5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  onPressed: () => _showDeleteProfileDialog(context),
+                  child: const Text(
+                    'Delete Profile',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFDC2626),
+                    ),
+                  ),
+                ),
+              ),
               const SizedBox(height: AppSpacing.xxl),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showDeleteProfileDialog(BuildContext context) {
+    final authProvider = context.read<AuthProvider>();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.borderXl),
+        title: const Text(
+          'Delete Profile',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
+        ),
+        content: const Text(
+          'Are you sure you want to delete your profile? This will log you out of your account.',
+          style: TextStyle(color: Color(0xFF475569)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              shape: RoundedRectangleBorder(borderRadius: AppRadius.borderMd),
+            ),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await authProvider.signOut();
+              if (context.mounted) {
+                context.go(AppRoutes.login);
+              }
+            },
+            child: const Text('Delete Profile', style: TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
     );
   }

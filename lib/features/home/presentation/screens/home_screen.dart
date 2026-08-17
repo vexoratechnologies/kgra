@@ -98,6 +98,13 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: () => context.push(AppRoutes.stateCommittee),
       ),
       _GridItem(
+        title: 'Executive Committee',
+        icon: LucideIcons.award,
+        iconColor: const Color(0xFFE11D48),
+        bgColor: const Color(0xFFE11D48).withOpacity(0.08),
+        onTap: () => context.push(AppRoutes.executiveCommittee),
+      ),
+      _GridItem(
         title: 'Zonal Committee',
         icon: LucideIcons.map,
         iconColor: kPurpleColor,
@@ -147,13 +154,6 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: () => context.push(AppRoutes.beneficiary),
       ),
       */
-      _GridItem(
-        title: 'Updates',
-        icon: LucideIcons.megaphone,
-        iconColor: kWarningColor,
-        bgColor: kWarningColor.withOpacity(0.08),
-        onTap: () => context.push(AppRoutes.updates),
-      ),
       _GridItem(
         title: 'Live Session',
         icon: LucideIcons.video,

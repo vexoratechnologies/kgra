@@ -23,6 +23,7 @@ import '../../features/videos/presentation/screens/videos_catalog_screen.dart';
 import '../../features/videos/presentation/screens/video_player_screen.dart';
 import '../../features/videos/data/models/video_model.dart';
 import '../../features/zonal/presentation/screens/zonal_committee_screen.dart';
+import '../../features/zonal/presentation/screens/executive_committee_screen.dart';
 import '../../features/auth/presentation/screens/admin_login_screen.dart';
 import '../../features/auth/presentation/screens/super_admin_login_screen.dart';
 import '../../features/admin/presentation/screens/super_admin_dashboard.dart';
@@ -60,6 +61,7 @@ class AppRoutes {
   static const String payment = '/payment';
   static const String beneficiary = '/beneficiary';
   static const String stateCommittee = '/state-committee';
+  static const String executiveCommittee = '/executive-committee';
   static const String zonalCommittee = '/zonal-committee';
   static const String meetingMinutes = '/meeting-minutes';
   static const String governmentOrders = '/government-orders';
@@ -290,6 +292,14 @@ class AppRoutes {
           context: context,
           state: state,
           child: const StateCommitteeScreen(),
+        ),
+      ),
+      GoRoute(
+        path: executiveCommittee,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          context: context,
+          state: state,
+          child: const ExecutiveCommitteeScreen(),
         ),
       ),
       GoRoute(

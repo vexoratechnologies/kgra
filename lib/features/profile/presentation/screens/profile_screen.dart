@@ -467,6 +467,78 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 12),
+
+            // ----------------------------------------------------
+            // Delete Profile Action Card
+            // ----------------------------------------------------
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(20.0),
+                border: Border.all(
+                  color: const Color(0xFFFCA5A5),
+                  width: 1.0,
+                ),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20.0),
+                  onTap: () => _showDeleteProfileDialog(context, authProvider),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFFEE2E2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            LucideIcons.trash2,
+                            color: Color(0xFFDC2626),
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Delete Profile',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFDC2626),
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Delete profile and sign out',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right,
+                          color: Color(0xFF94A3B8),
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 24),
           ],
         ),
@@ -569,6 +641,43 @@ class ProfileScreen extends StatelessWidget {
               }
             },
             child: const Text('Sign Out', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteProfileDialog(BuildContext context, AuthProvider authProvider) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.borderXl),
+        title: const Text(
+          'Delete Profile',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
+        ),
+        content: const Text(
+          'Are you sure you want to delete your profile? This will log you out of your account.',
+          style: TextStyle(color: Color(0xFF475569)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              shape: RoundedRectangleBorder(borderRadius: AppRadius.borderMd),
+            ),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await authProvider.signOut();
+              if (context.mounted) {
+                context.go(AppRoutes.login);
+              }
+            },
+            child: const Text('Delete Profile', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
