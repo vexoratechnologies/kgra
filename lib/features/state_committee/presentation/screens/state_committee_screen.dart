@@ -48,7 +48,7 @@ class _StateCommitteeScreenState extends State<StateCommitteeScreen> {
     return Scaffold(
       backgroundColor: AppColors.brandBackground,
       appBar: CompactAppBar(
-        title: 'State Committee',
+        title: 'State Committee Members',
         subtitle: 'Office bearers',
         rightIcon: Icons.people_outline,
         onBackTap: () {

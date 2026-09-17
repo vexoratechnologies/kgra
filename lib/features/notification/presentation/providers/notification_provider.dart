@@ -1,26 +1,117 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/push_notification_service.dart';
 import '../../data/models/notification_model.dart';
 import '../../data/repositories/notification_repository.dart';
 
 class NotificationProvider extends ChangeNotifier {
-  final NotificationRepository _repository;
+  static const String _kLastReadTimeKey = 'last_read_notification_time';
+  static const String _kReadIdsKey = 'read_notification_ids';
 
-  NotificationProvider({required NotificationRepository repository}) : _repository = repository;
+  final NotificationRepository _repository;
+  final SharedPreferences _prefs;
+
+  NotificationProvider({
+    required NotificationRepository repository,
+    required SharedPreferences prefs,
+  })  : _repository = repository,
+        _prefs = prefs {
+    _loadReadState();
+  }
 
   List<NotificationModel> _notifications = [];
   bool _isLoading = false;
   String? _error;
   bool _hasMore = true;
   bool _isFetchingMore = false;
-  int _totalCount = 0;
+  int _unreadCount = 0;
+  int _firestoreTotalCount = 0;
+
+  String? _lastReadTime;
+  Set<String> _readIds = {};
 
   List<NotificationModel> get notificationsList => _notifications;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get hasMore => _hasMore;
   bool get isFetchingMore => _isFetchingMore;
-  int get totalCount => _totalCount;
+
+  /// Returns unread notifications count for badge display.
+  int get unreadCount => _unreadCount;
+
+  /// Backward-compatible alias for badge consumers (e.g. HomeScreen, MainNav)
+  int get totalCount => _unreadCount;
+
+  /// Total notification count in database
+  int get totalFirestoreCount => _firestoreTotalCount;
+
+  void _loadReadState() {
+    _lastReadTime = _prefs.getString(_kLastReadTimeKey);
+    final list = _prefs.getStringList(_kReadIdsKey) ?? [];
+    _readIds = list.toSet();
+  }
+
+  void _saveReadState() {
+    if (_lastReadTime != null) {
+      _prefs.setString(_kLastReadTimeKey, _lastReadTime!);
+    }
+    final list = _readIds.toList();
+    if (list.length > 100) {
+      _readIds = list.sublist(list.length - 100).toSet();
+    }
+    _prefs.setStringList(_kReadIdsKey, _readIds.toList());
+  }
+
+  void _calculateUnreadCount() {
+    if (_notifications.isEmpty) {
+      _unreadCount = 0;
+      return;
+    }
+    int count = 0;
+    for (final n in _notifications) {
+      if (_isUnread(n)) {
+        count++;
+      }
+    }
+    _unreadCount = count;
+  }
+
+  bool _isUnread(NotificationModel n) {
+    if (_readIds.contains(n.id)) return false;
+    if (_lastReadTime != null) {
+      if (n.createdAt.isEmpty) return false;
+      final notifTime = DateTime.tryParse(n.createdAt);
+      final lastRead = DateTime.tryParse(_lastReadTime!);
+      if (notifTime != null && lastRead != null) {
+        return notifTime.isAfter(lastRead);
+      }
+      return false;
+    }
+    return true;
+  }
+
+  bool isNotificationRead(NotificationModel n) {
+    return !_isUnread(n);
+  }
+
+  void markAllAsRead() {
+    _lastReadTime = DateTime.now().toIso8601String();
+    for (final n in _notifications) {
+      _readIds.add(n.id);
+    }
+    _saveReadState();
+    _unreadCount = 0;
+    notifyListeners();
+  }
+
+  void markAsRead(String id) {
+    if (!_readIds.contains(id)) {
+      _readIds.add(id);
+      _saveReadState();
+      _calculateUnreadCount();
+      notifyListeners();
+    }
+  }
 
   void _setLoading(bool val) {
     _isLoading = val;
@@ -42,10 +133,11 @@ class NotificationProvider extends ChangeNotifier {
         _repository.getNotificationsCount(),
       ]);
       _notifications = results[0] as List<NotificationModel>;
-      _totalCount = results[1] as int;
+      _firestoreTotalCount = results[1] as int;
       if (_notifications.length < 15) {
         _hasMore = false;
       }
+      _calculateUnreadCount();
     } catch (e) {
       _setError('Failed to fetch notifications: ${e.toString()}');
     } finally {
@@ -72,6 +164,7 @@ class NotificationProvider extends ChangeNotifier {
       }
 
       _notifications.addAll(moreNotifications);
+      _calculateUnreadCount();
     } catch (e) {
       _setError('Failed to fetch more notifications: ${e.toString()}');
     } finally {
@@ -97,7 +190,9 @@ class NotificationProvider extends ChangeNotifier {
     try {
       await _repository.deleteNotification(id);
       _notifications.removeWhere((n) => n.id == id);
-      if (_totalCount > 0) _totalCount--;
+      _readIds.remove(id);
+      _saveReadState();
+      _calculateUnreadCount();
       notifyListeners();
       return true;
     } catch (e) {

@@ -81,12 +81,45 @@ class _GovernmentOrdersScreenState extends State<GovernmentOrdersScreen> {
     final orders = provider.orders;
 
     final adminProvider = context.watch<AdminProvider>();
-    final zonesList = adminProvider.zones;
+    final rawZonesList = adminProvider.zones;
     final userZone = context.watch<AuthProvider>().currentUser?.zone;
 
-    if (_selectedZone == null || !zonesList.contains(_selectedZone)) {
-      if (userZone != null && userZone.isNotEmpty && zonesList.contains(userZone)) {
-        _selectedZone = userZone;
+    bool isNonZonal(String z) {
+      final l = z.trim().toLowerCase();
+      return l.isEmpty ||
+          l == 'all' ||
+          l == 'state' ||
+          l.contains('executive');
+    }
+
+    String formatZoneName(String z) {
+      final trimmed = z.trim();
+      if (trimmed.isEmpty) return '';
+      return trimmed.split(' ').map((word) {
+        if (word.isEmpty) return '';
+        return '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}';
+      }).join(' ');
+    }
+
+    // Build unified zones list excluding non-zonal entries (Executive, State, All)
+    final Map<String, String> uniqueZones = {};
+    for (final z in rawZonesList) {
+      if (!isNonZonal(z)) {
+        final key = z.trim().toLowerCase();
+        uniqueZones.putIfAbsent(key, () => formatZoneName(z));
+      }
+    }
+    for (final o in orders) {
+      if (!isNonZonal(o.zone)) {
+        final key = o.zone.trim().toLowerCase();
+        uniqueZones.putIfAbsent(key, () => formatZoneName(o.zone));
+      }
+    }
+    final zonesList = uniqueZones.values.toList()..sort();
+
+    if (_selectedZone == null || !zonesList.any((z) => z.toLowerCase() == _selectedZone?.toLowerCase())) {
+      if (userZone != null && userZone.isNotEmpty && zonesList.any((z) => z.toLowerCase() == userZone.toLowerCase())) {
+        _selectedZone = zonesList.firstWhere((z) => z.toLowerCase() == userZone.toLowerCase());
       } else if (zonesList.isNotEmpty) {
         _selectedZone = zonesList.first;
       }
@@ -95,9 +128,35 @@ class _GovernmentOrdersScreenState extends State<GovernmentOrdersScreen> {
     final filteredOrders = orders.where((o) {
       final matchesSearch = o.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           o.orderNumber.toLowerCase().contains(_searchQuery.toLowerCase());
-      final matchesSection = _selectedSection == 'all' || o.section == _selectedSection;
-      final matchesZone = _selectedSection != 'zonal' || o.zone == _selectedZone;
-      return matchesSearch && matchesSection && matchesZone;
+      
+      final bool matchesSectionAndZone;
+      if (_selectedSection == 'all') {
+        matchesSectionAndZone = true;
+      } else if (_selectedSection == 'zonal') {
+        final zoneMatches = _selectedZone != null &&
+            o.zone.trim().isNotEmpty &&
+            o.zone.trim().toLowerCase() == _selectedZone!.trim().toLowerCase();
+        final isZonal = o.section.toLowerCase() == 'zonal' ||
+            (o.zone.trim().isNotEmpty &&
+                o.zone.trim().toLowerCase() != 'state' &&
+                o.zone.trim().toLowerCase() != 'all' &&
+                o.zone.trim().toLowerCase() != 'executive' &&
+                o.zone.trim().toLowerCase() != 'executive committee');
+        matchesSectionAndZone = isZonal && zoneMatches;
+      } else if (_selectedSection == 'state') {
+        matchesSectionAndZone = o.section.toLowerCase() == 'state' ||
+            o.zone.trim().toLowerCase() == 'state' ||
+            (o.section.toLowerCase() == 'all' &&
+                (o.zone.trim().isEmpty || o.zone.trim().toLowerCase() == 'all'));
+      } else if (_selectedSection == 'executive') {
+        matchesSectionAndZone = o.section.toLowerCase() == 'executive' ||
+            o.zone.trim().toLowerCase() == 'executive' ||
+            o.zone.trim().toLowerCase() == 'executive committee';
+      } else {
+        matchesSectionAndZone = o.section.toLowerCase() == _selectedSection.toLowerCase();
+      }
+
+      return matchesSearch && matchesSectionAndZone;
     }).toList();
 
     return Scaffold(
@@ -156,7 +215,9 @@ class _GovernmentOrdersScreenState extends State<GovernmentOrdersScreen> {
                 padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
                 color: Colors.white,
                 child: DropdownButtonFormField<String>(
-                  value: _selectedZone,
+                  value: zonesList.any((z) => z.toLowerCase() == _selectedZone?.toLowerCase())
+                      ? zonesList.firstWhere((z) => z.toLowerCase() == _selectedZone?.toLowerCase())
+                      : (zonesList.isNotEmpty ? zonesList.first : null),
                   decoration: InputDecoration(
                     labelText: 'Filter by Zone',
                     filled: true,

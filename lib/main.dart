@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 // ignore: depend_on_referenced_packages
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'core/services/push_notification_service.dart';
+import 'core/update/app_version_service.dart';
 import 'app.dart';
 import 'injection.dart';
 import 'firebase_options.dart';
@@ -31,6 +31,12 @@ void main() async {
       await auth.signInAnonymously();
       debugPrint('Established anonymous session on startup.');
     }
+
+    // Initialize Remote App Lock & Version Checker
+    await AppVersionService.instance.init();
+    AppVersionService.instance.startVersionListener(
+      rootNode: '0',
+    );
   } catch (e) {
     debugPrint('Firebase not initialized: $e');
   }

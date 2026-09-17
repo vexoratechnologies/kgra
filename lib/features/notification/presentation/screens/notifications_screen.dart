@@ -25,7 +25,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     super.initState();
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<NotificationProvider>().fetchNotifications();
+      final notif = context.read<NotificationProvider>();
+      notif.fetchNotifications().then((_) {
+        if (widget.showBackButton) {
+          notif.markAllAsRead();
+        }
+      });
     });
   }
 
@@ -64,7 +69,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       body: SafeArea(
         child: RefreshIndicator(
           color: AppColors.brandPrimary,
-          onRefresh: () => provider.fetchNotifications(),
+          onRefresh: () async {
+            await provider.fetchNotifications();
+            provider.markAllAsRead();
+          },
           child: provider.isLoading && notifications.isEmpty
               ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
               : provider.error != null
@@ -113,12 +121,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               );
                             }
                             final n = notifications[index];
+                            final isRead = provider.isNotificationRead(n);
                             return Container(
                               margin: const EdgeInsets.only(bottom: 10),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: AppRadius.borderLg,
-                                border: Border.all(color: Colors.grey.shade100),
+                                border: Border.all(
+                                  color: isRead ? Colors.grey.shade100 : AppColors.brandPrimary.withValues(alpha: 0.25),
+                                ),
                                 boxShadow: [
                                   BoxShadow(
                                     color: Colors.black.withValues(alpha: 0.02),
@@ -132,6 +143,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 child: InkWell(
                                   borderRadius: AppRadius.borderLg,
                                   onTap: () {
+                                    provider.markAsRead(n.id);
                                     if (n.routingPath.isNotEmpty) {
                                       context.push(n.routingPath);
                                     }
@@ -144,12 +156,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                         Container(
                                           padding: const EdgeInsets.all(8),
                                           decoration: BoxDecoration(
-                                            color: AppColors.brandPrimary.withValues(alpha: 0.05),
+                                            color: isRead
+                                                ? Colors.grey.shade100
+                                                : AppColors.brandPrimary.withValues(alpha: 0.08),
                                             shape: BoxShape.circle,
                                           ),
-                                          child: const Icon(
-                                            Icons.notifications_active,
-                                            color: AppColors.brandPrimary,
+                                          child: Icon(
+                                            isRead ? Icons.notifications_none : Icons.notifications_active,
+                                            color: isRead ? Colors.grey.shade500 : AppColors.brandPrimary,
                                             size: 18,
                                           ),
                                         ),

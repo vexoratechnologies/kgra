@@ -8,6 +8,7 @@ import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/widgets/compact_app_bar.dart';
+import '../../../../core/utils/app_date_formatter.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
 /// ProfileScreen displays the member's profile card, personal information,
@@ -380,12 +381,30 @@ class ProfileScreen extends StatelessWidget {
                           value: institution,
                           onTap: () => context.push(AppRoutes.editProfile),
                         ),
+                        if (user?.dateOfBirth != null && user!.dateOfBirth!.isNotEmpty) ...[
+                          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                          _buildInfoItem(
+                            icon: LucideIcons.calendar,
+                            label: 'Date of Birth',
+                            value: AppDateFormatter.formatToDateMonthYear(user.dateOfBirth!),
+                            onTap: () => context.push(AppRoutes.editProfile),
+                          ),
+                        ],
                         if (user?.dateOfJoin != null && user!.dateOfJoin!.isNotEmpty) ...[
                           const Divider(height: 1, color: Color(0xFFF1F5F9)),
                           _buildInfoItem(
                             icon: LucideIcons.calendar,
                             label: 'Date of Join',
-                            value: user.dateOfJoin!,
+                            value: AppDateFormatter.formatToDateMonthYear(user.dateOfJoin!),
+                            onTap: () => context.push(AppRoutes.editProfile),
+                          ),
+                        ],
+                        if (user?.dateOfRetirement != null && user!.dateOfRetirement!.isNotEmpty) ...[
+                          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                          _buildInfoItem(
+                            icon: LucideIcons.calendar,
+                            label: 'Date of Retirement',
+                            value: AppDateFormatter.formatToDateMonthYear(user.dateOfRetirement!),
                             onTap: () => context.push(AppRoutes.editProfile),
                           ),
                         ],

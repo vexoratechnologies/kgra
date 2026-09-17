@@ -163,7 +163,10 @@ Future<void> initInjection() async {
     () => UpdatesProvider(repository: locator<UpdatesRepository>()),
   );
   locator.registerFactory<NotificationProvider>(
-    () => NotificationProvider(repository: locator<NotificationRepository>()),
+    () => NotificationProvider(
+      repository: locator<NotificationRepository>(),
+      prefs: locator<SharedPreferences>(),
+    ),
   );
   locator.registerFactory<LiveSessionProvider>(
     () => LiveSessionProvider(repository: locator<LiveSessionRepository>()),

@@ -44,16 +44,43 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
     final zonalProvider = context.watch<ZonalProvider>();
     final adminProvider = context.watch<AdminProvider>();
     
-    final zones = adminProvider.zones.where((z) => !z.toLowerCase().contains('executive')).toList();
-    
-    // Automatically select 'All' if not selected yet
-    if (_selectedZone == null) {
-      _selectedZone = 'All';
+    bool isNonZonal(String z) {
+      final l = z.trim().toLowerCase();
+      return l.isEmpty ||
+          l == 'all' ||
+          l == 'state' ||
+          l.contains('executive');
     }
+
+    String formatZoneName(String z) {
+      final trimmed = z.trim();
+      if (trimmed.isEmpty) return '';
+      return trimmed.split(' ').map((word) {
+        if (word.isEmpty) return '';
+        return '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}';
+      }).join(' ');
+    }
+
+    final Map<String, String> uniqueZones = {};
+    for (final z in adminProvider.zones) {
+      if (!isNonZonal(z)) {
+        uniqueZones.putIfAbsent(z.trim().toLowerCase(), () => formatZoneName(z));
+      }
+    }
+    for (final m in zonalProvider.members) {
+      if (!isNonZonal(m.zone)) {
+        uniqueZones.putIfAbsent(m.zone.trim().toLowerCase(), () => formatZoneName(m.zone));
+      }
+    }
+    final zones = uniqueZones.values.toList()..sort();
+
+    // Automatically select 'All' if not selected yet
+    _selectedZone ??= 'All';
 
     final filteredMembers = zonalProvider.members.where((m) {
       final isNotExec = !m.zone.toLowerCase().contains('executive');
-      final matchesZone = _selectedZone == 'All' || m.zone == _selectedZone;
+      final matchesZone = _selectedZone == 'All' ||
+          m.zone.trim().toLowerCase() == _selectedZone?.trim().toLowerCase();
       final matchesQuery = m.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           m.designation.toLowerCase().contains(_searchQuery.toLowerCase());
       return isNotExec && matchesZone && matchesQuery;
@@ -62,7 +89,7 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
     return Scaffold(
       backgroundColor: AppColors.brandBackground,
       appBar: CompactAppBar(
-        title: 'Zonal Committee',
+        title: 'Zonal Committee Members',
         subtitle: 'Zonal office bearers & leaders',
         rightIcon: Icons.map_outlined,
         onBackTap: () {
@@ -89,7 +116,9 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: _selectedZone,
+                      value: ['All', ...zones].any((z) => z.toLowerCase() == _selectedZone?.toLowerCase())
+                          ? ['All', ...zones].firstWhere((z) => z.toLowerCase() == _selectedZone?.toLowerCase())
+                          : 'All',
                       decoration: const InputDecoration(
                         contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),

@@ -48,8 +48,12 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
       _selectedIndex = index;
     });
     if (index == 1) {
-      // Trigger a fresh fetch of notifications when the Alerts tab is selected
-      context.read<NotificationProvider>().fetchNotifications();
+      // Trigger a fresh fetch of notifications when the Alerts tab is selected and mark as read
+      final notif = context.read<NotificationProvider>();
+      notif.markAllAsRead();
+      notif.fetchNotifications().then((_) {
+        notif.markAllAsRead();
+      });
     }
   }
 

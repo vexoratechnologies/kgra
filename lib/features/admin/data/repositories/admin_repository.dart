@@ -45,6 +45,11 @@ class AdminRepository {
     return await _firestoreService.getUsersByStatus(status);
   }
 
+  /// Deletes a user document completely by UID.
+  Future<void> deleteUser(String uid) async {
+    await _firestoreService.deleteUser(uid);
+  }
+
   // ==========================================
   // Admin & Zones Management
   // ==========================================

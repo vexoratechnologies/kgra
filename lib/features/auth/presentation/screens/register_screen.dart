@@ -372,9 +372,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         const SizedBox(height: AppSpacing.sm),
                         Consumer<AdminProvider>(
                           builder: (context, adminProv, child) {
-                            final zonesList = adminProv.zones;
+                            final zonesList = adminProv.zones.where((z) {
+                              final clean = z.trim().toLowerCase();
+                              return clean.isNotEmpty &&
+                                  !clean.contains('exec') &&
+                                  !clean.contains('state') &&
+                                  clean != 'all';
+                            }).toSet().toList();
                             return DropdownButtonFormField<String>(
-                              value: _selectedZone,
+                              value: _selectedZone != null && zonesList.contains(_selectedZone) ? _selectedZone : null,
                               hint: const Text('Select your zone'),
                               decoration: const InputDecoration(
                                 prefixIcon: Icon(Icons.map_outlined),
@@ -418,15 +424,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             suffixIcon: Icon(Icons.calendar_today_outlined),
                           ),
                           onTap: () async {
+                            DateTime initial = DateTime.now().subtract(const Duration(days: 365 * 25));
+                            if (_dobController.text.isNotEmpty) {
+                              try {
+                                initial = DateFormat('dd-MM-yyyy').parseStrict(_dobController.text.trim());
+                              } catch (_) {
+                                try {
+                                  initial = DateFormat('yyyy-MM-dd').parse(_dobController.text.trim());
+                                } catch (_) {}
+                              }
+                            }
+                            final firstDate = DateTime(1900);
+                            final lastDate = DateTime.now();
+                            if (initial.isBefore(firstDate)) initial = firstDate;
+                            if (initial.isAfter(lastDate)) initial = lastDate;
+
                             final picked = await showDatePicker(
                               context: context,
-                              initialDate: DateTime.now().subtract(const Duration(days: 365 * 25)),
-                              firstDate: DateTime(1900),
-                              lastDate: DateTime.now(),
+                              initialDate: initial,
+                              firstDate: firstDate,
+                              lastDate: lastDate,
                             );
                             if (picked != null) {
                               setState(() {
-                                _dobController.text = DateFormat('yyyy-MM-dd').format(picked);
+                                _dobController.text = DateFormat('dd-MM-yyyy').format(picked);
                               });
                             }
                           },
@@ -457,15 +478,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             suffixIcon: Icon(Icons.calendar_today_outlined),
                           ),
                           onTap: () async {
+                            DateTime initial = DateTime.now();
+                            if (_dojController.text.isNotEmpty) {
+                              try {
+                                initial = DateFormat('dd-MM-yyyy').parseStrict(_dojController.text.trim());
+                              } catch (_) {
+                                try {
+                                  initial = DateFormat('yyyy-MM-dd').parse(_dojController.text.trim());
+                                } catch (_) {}
+                              }
+                            }
+                            final firstDate = DateTime(1950);
+                            final lastDate = DateTime.now();
+                            if (initial.isBefore(firstDate)) initial = firstDate;
+                            if (initial.isAfter(lastDate)) initial = lastDate;
+
                             final picked = await showDatePicker(
                               context: context,
-                              initialDate: DateTime.now(),
-                              firstDate: DateTime(1950),
-                              lastDate: DateTime.now(),
+                              initialDate: initial,
+                              firstDate: firstDate,
+                              lastDate: lastDate,
                             );
                             if (picked != null) {
                               setState(() {
-                                _dojController.text = DateFormat('yyyy-MM-dd').format(picked);
+                                _dojController.text = DateFormat('dd-MM-yyyy').format(picked);
                               });
                             }
                           },
@@ -493,7 +529,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           keyboardType: TextInputType.text,
                           decoration: const InputDecoration(
                             hintText: 'Auto-generated (e.g. KGRATVM/01)',
-                            helperText: 'Auto-assigned sequentially based on selected zone',
+                            helperText: 'Auto-assigned sequentially across registrations with zone prefix',
                             prefixIcon: Icon(Icons.card_membership_outlined),
                           ),
                           validator: (value) {
@@ -523,15 +559,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             suffixIcon: Icon(Icons.calendar_today_outlined),
                           ),
                           onTap: () async {
+                            DateTime initial = DateTime.now().add(const Duration(days: 365 * 5));
+                            if (_retirementController.text.isNotEmpty) {
+                              try {
+                                initial = DateFormat('dd-MM-yyyy').parseStrict(_retirementController.text.trim());
+                              } catch (_) {
+                                try {
+                                  initial = DateFormat('yyyy-MM-dd').parse(_retirementController.text.trim());
+                                } catch (_) {}
+                              }
+                            }
+                            final firstDate = DateTime.now().subtract(const Duration(days: 365 * 10));
+                            final lastDate = DateTime(2100);
+                            if (initial.isBefore(firstDate)) initial = firstDate;
+                            if (initial.isAfter(lastDate)) initial = lastDate;
+
                             final picked = await showDatePicker(
                               context: context,
-                              initialDate: DateTime.now().add(const Duration(days: 365 * 5)),
-                              firstDate: DateTime.now().subtract(const Duration(days: 365 * 10)),
-                              lastDate: DateTime(2100),
+                              initialDate: initial,
+                              firstDate: firstDate,
+                              lastDate: lastDate,
                             );
                             if (picked != null) {
                               setState(() {
-                                _retirementController.text = DateFormat('yyyy-MM-dd').format(picked);
+                                _retirementController.text = DateFormat('dd-MM-yyyy').format(picked);
                               });
                             }
                           },

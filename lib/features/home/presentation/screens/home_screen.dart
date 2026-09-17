@@ -91,21 +91,21 @@ class _HomeScreenState extends State<HomeScreen> {
     // Grid action items mapping
     final allGridItems = [
       _GridItem(
-        title: 'State Committee',
+        title: 'State Committee Members',
         icon: LucideIcons.users,
         iconColor: kBlueColor,
         bgColor: kBlueColor.withOpacity(0.08),
         onTap: () => context.push(AppRoutes.stateCommittee),
       ),
       _GridItem(
-        title: 'Executive Committee',
+        title: 'Executive Committee Members',
         icon: LucideIcons.award,
         iconColor: const Color(0xFFE11D48),
         bgColor: const Color(0xFFE11D48).withOpacity(0.08),
         onTap: () => context.push(AppRoutes.executiveCommittee),
       ),
       _GridItem(
-        title: 'Zonal Committee',
+        title: 'Zonal Committee Members',
         icon: LucideIcons.map,
         iconColor: kPurpleColor,
         bgColor: kPurpleColor.withOpacity(0.08),
@@ -132,7 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
         bgColor: const Color(0xFF0D9488).withOpacity(0.08),
         onTap: () => context.push(AppRoutes.formsCirculars),
       ),
-      /*
+
       _GridItem(
         title: 'Membership',
         icon: LucideIcons.userPlus,
@@ -153,7 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
         isComingSoon: true,
         onTap: () => context.push(AppRoutes.beneficiary),
       ),
-      */
+
       _GridItem(
         title: 'Live Session',
         icon: LucideIcons.video,

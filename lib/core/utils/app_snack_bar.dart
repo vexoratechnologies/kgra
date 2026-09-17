@@ -16,55 +16,33 @@ class AppSnackBar {
     _show(context, message, isError: false);
   }
 
-  /// Format raw Firebase/Firestore exception messages into polished human-readable warnings
-  static String _formatFirebaseError(String error) {
-    final lower = error.toLowerCase();
-    if (lower.contains('permission-denied') || lower.contains('permission')) {
-      return 'Access Denied: You do not have permission to execute this operation.';
-    } else if (lower.contains('network-request-failed') || lower.contains('network')) {
-      return 'Network Error: Please check your internet connection and try again.';
-    } else if (lower.contains('user-not-found') || lower.contains('no-user')) {
-      return 'Account not found. Please register first.';
-    } else if (lower.contains('wrong-password') || lower.contains('invalid-credential')) {
-      return 'Incorrect credentials. Please try again.';
-    } else if (lower.contains('invalid-phone-number')) {
-      return 'The phone number entered is invalid.';
-    } else if (lower.contains('too-many-requests')) {
-      return 'Too many requests. Please try again later.';
-    } else if (lower.contains('session-expired')) {
-      return 'Your session has expired. Please log in again.';
-    } else if (lower.contains('unavailable')) {
-      return 'Service is temporarily unavailable. Please try again later.';
-    }
-    
-    // Strip technical tag like "[cloud_firestore/permission-denied]" if present
-    if (error.contains(']')) {
-      return error.split(']').last.trim();
-    }
-    return error;
-  }
+
 
   static void _show(BuildContext context, String rawMessage, {required bool isError}) {
-    final message = isError ? _formatFirebaseError(rawMessage) : rawMessage;
+    final message = rawMessage.trim().isNotEmpty ? rawMessage.trim() : 'An unexpected error occurred.';
     
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              isError ? Icons.error_outline : Icons.check_circle_outline,
-              color: Colors.white,
-              size: 20,
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Icon(
+                isError ? Icons.error_outline : Icons.check_circle_outline,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
+              child: SelectableText(
                 message,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w500,
                   letterSpacing: 0.2,
                 ),
               ),
@@ -78,7 +56,7 @@ class AppSnackBar {
           borderRadius: BorderRadius.circular(12),
         ),
         elevation: 6,
-        duration: const Duration(seconds: 4),
+        duration: const Duration(seconds: 8),
       ),
     );
   }

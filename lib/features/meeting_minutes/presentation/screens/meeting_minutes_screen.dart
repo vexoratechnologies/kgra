@@ -81,23 +81,82 @@ class _MeetingMinutesScreenState extends State<MeetingMinutesScreen> {
     final minutes = provider.minutesList;
     
     final adminProvider = context.watch<AdminProvider>();
-    final zonesList = adminProvider.zones;
+    final rawZonesList = adminProvider.zones;
     final userZone = context.watch<AuthProvider>().currentUser?.zone;
 
-    if (_selectedZone == null || !zonesList.contains(_selectedZone)) {
-      if (userZone != null && userZone.isNotEmpty && zonesList.contains(userZone)) {
-        _selectedZone = userZone;
+    bool isNonZonal(String z) {
+      final l = z.trim().toLowerCase();
+      return l.isEmpty ||
+          l == 'all' ||
+          l == 'state' ||
+          l.contains('executive');
+    }
+
+    String formatZoneName(String z) {
+      final trimmed = z.trim();
+      if (trimmed.isEmpty) return '';
+      return trimmed.split(' ').map((word) {
+        if (word.isEmpty) return '';
+        return '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}';
+      }).join(' ');
+    }
+
+    // Build unified zones list excluding non-zonal entries (Executive, State, All)
+    final Map<String, String> uniqueZones = {};
+    for (final z in rawZonesList) {
+      if (!isNonZonal(z)) {
+        final key = z.trim().toLowerCase();
+        uniqueZones.putIfAbsent(key, () => formatZoneName(z));
+      }
+    }
+    for (final m in minutes) {
+      if (!isNonZonal(m.zone)) {
+        final key = m.zone.trim().toLowerCase();
+        uniqueZones.putIfAbsent(key, () => formatZoneName(m.zone));
+      }
+    }
+    final zonesList = uniqueZones.values.toList()..sort();
+
+    if (_selectedZone == null || !zonesList.any((z) => z.toLowerCase() == _selectedZone?.toLowerCase())) {
+      if (userZone != null && userZone.isNotEmpty && zonesList.any((z) => z.toLowerCase() == userZone.toLowerCase())) {
+        _selectedZone = zonesList.firstWhere((z) => z.toLowerCase() == userZone.toLowerCase());
       } else if (zonesList.isNotEmpty) {
         _selectedZone = zonesList.first;
       }
     }
 
     final filteredMinutes = minutes.where((m) {
-      final matchesStatus = m.status == 'approved';
+      final matchesStatus = m.status.toLowerCase() == 'approved';
       final matchesSearch = m.title.toLowerCase().contains(_searchQuery.toLowerCase());
-      final matchesSection = _selectedSection == 'all' || m.section == _selectedSection;
-      final matchesZone = _selectedSection != 'zonal' || m.zone == _selectedZone;
-      return matchesStatus && matchesSearch && matchesSection && matchesZone;
+      
+      final bool matchesSectionAndZone;
+      if (_selectedSection == 'all') {
+        matchesSectionAndZone = true;
+      } else if (_selectedSection == 'zonal') {
+        final zoneMatches = _selectedZone != null &&
+            m.zone.trim().isNotEmpty &&
+            m.zone.trim().toLowerCase() == _selectedZone!.trim().toLowerCase();
+        final isZonal = m.section.toLowerCase() == 'zonal' ||
+            (m.zone.trim().isNotEmpty &&
+                m.zone.trim().toLowerCase() != 'state' &&
+                m.zone.trim().toLowerCase() != 'all' &&
+                m.zone.trim().toLowerCase() != 'executive' &&
+                m.zone.trim().toLowerCase() != 'executive committee');
+        matchesSectionAndZone = isZonal && zoneMatches;
+      } else if (_selectedSection == 'state') {
+        matchesSectionAndZone = m.section.toLowerCase() == 'state' ||
+            m.zone.trim().toLowerCase() == 'state' ||
+            (m.section.toLowerCase() == 'all' &&
+                (m.zone.trim().isEmpty || m.zone.trim().toLowerCase() == 'all'));
+      } else if (_selectedSection == 'executive') {
+        matchesSectionAndZone = m.section.toLowerCase() == 'executive' ||
+            m.zone.trim().toLowerCase() == 'executive' ||
+            m.zone.trim().toLowerCase() == 'executive committee';
+      } else {
+        matchesSectionAndZone = m.section.toLowerCase() == _selectedSection.toLowerCase();
+      }
+
+      return matchesStatus && matchesSearch && matchesSectionAndZone;
     }).toList();
 
     return Scaffold(
@@ -156,7 +215,9 @@ class _MeetingMinutesScreenState extends State<MeetingMinutesScreen> {
                 padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
                 color: Colors.white,
                 child: DropdownButtonFormField<String>(
-                  value: _selectedZone,
+                  value: zonesList.any((z) => z.toLowerCase() == _selectedZone?.toLowerCase())
+                      ? zonesList.firstWhere((z) => z.toLowerCase() == _selectedZone?.toLowerCase())
+                      : (zonesList.isNotEmpty ? zonesList.first : null),
                   decoration: InputDecoration(
                     labelText: 'Filter by Zone',
                     filled: true,

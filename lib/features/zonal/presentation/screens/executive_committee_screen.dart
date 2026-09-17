@@ -51,7 +51,7 @@ class _ExecutiveCommitteeScreenState extends State<ExecutiveCommitteeScreen> {
     return Scaffold(
       backgroundColor: AppColors.brandBackground,
       appBar: CompactAppBar(
-        title: 'Executive Committee',
+        title: 'Executive Committee Members',
         subtitle: 'Executive Office Bearers & Committee Leaders',
         rightIcon: Icons.stars_outlined,
         onBackTap: () {

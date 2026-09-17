@@ -15,6 +15,7 @@ import '../../../../core/theme/app_text_style.dart';
 import '../../../../core/widgets/app_pdf_viewer_screen.dart';
 import '../../../../core/widgets/compact_app_bar.dart';
 import '../../../../core/utils/file_picker_helper.dart';
+import '../../../../core/utils/app_date_formatter.dart';
 import '../../../../features/auth/data/models/user_model.dart';
 import '../../../../features/state_committee/presentation/providers/state_committee_provider.dart';
 import '../../../../features/state_committee/data/models/committee_member_model.dart';
@@ -56,7 +57,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   // Mock Settings States
-  bool _autoApprove = false;
   String _clearanceLevel = 'General';
 
   @override
@@ -110,11 +110,13 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       _refreshAllData();
     } else if (label == 'Pending Approvals') {
       context.read<AdminProvider>().fetchPendingUsers();
-    } else if (label == 'Approved Members') {
+    } else if (label == 'Approved Members' || label == 'Zone Members') {
       context.read<AdminProvider>().fetchApprovedUsers();
     } else if (label == 'Rejected Requests') {
       context.read<AdminProvider>().fetchRejectedUsers();
-    } else if (label == 'Zonal Committee' || label == 'Executive Committee') {
+    } else if (label == 'Committee Members' || label == 'State Committee' || label == 'State Committee Members') {
+      context.read<StateCommitteeProvider>().fetchMembers();
+    } else if (label == 'Zonal Committee' || label == 'Zonal Committee Members' || label == 'Executive Committee' || label == 'Executive Committee Members') {
       context.read<ZonalProvider>().fetchMembers();
     } else if (label == 'Meeting Minutes') {
       context.read<MeetingMinutesProvider>().fetchAllMinutes();
@@ -168,6 +170,25 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _handleDeleteUser(BuildContext context, String uid, AdminProvider provider) async {
+    _confirmDelete(
+      context,
+      title: 'Delete Member',
+      content: 'Are you sure you want to permanently delete this member registration? This action cannot be undone.',
+      onConfirm: () async {
+        final success = await provider.deleteUser(uid);
+        if (success && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Member deleted successfully.'),
+              backgroundColor: Colors.black87,
+            ),
+          );
+        }
+      },
+    );
   }
 
   List<UserModel> _filterUsers(List<UserModel> users) {
@@ -257,6 +278,10 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   Widget _buildTopBar(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width >= 850;
+    final adminProvider = context.watch<AdminProvider>();
+    final isZonalAdmin = adminProvider.isZonalAdmin;
+    final zoneName = adminProvider.zonalAdminZone;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: 12),
       decoration: BoxDecoration(
@@ -301,18 +326,39 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               const SizedBox(width: AppSpacing.lg),
               const VerticalDivider(width: 1, indent: 8, endIndent: 8),
               const SizedBox(width: AppSpacing.lg),
-              const CircleAvatar(
+              CircleAvatar(
                 radius: 18,
                 backgroundColor: AppColors.brandPrimary,
-                child: Icon(Icons.admin_panel_settings, color: Colors.white, size: 20),
+                child: Icon(
+                  isZonalAdmin ? Icons.location_city : Icons.admin_panel_settings,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: AppSpacing.sm),
-              Text(
-                'Admin Portal',
-                style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    isZonalAdmin && zoneName != null && zoneName.isNotEmpty
+                        ? 'Zonal Admin'
+                        : 'Admin Portal',
+                    style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  if (isZonalAdmin && zoneName != null && zoneName.isNotEmpty)
+                    Text(
+                      'Zone: $zoneName',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.brandPrimary,
+                      ),
+                    ),
+                ],
               ),
             ],
           ),
@@ -368,10 +414,10 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'My KGRA',
                       style: TextStyle(
                         fontFamily: 'Manrope',
@@ -382,8 +428,10 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       ),
                     ),
                     Text(
-                      'Admin Dashboard',
-                      style: TextStyle(
+                      adminProvider.isZonalAdmin && adminProvider.zonalAdminZone != null
+                          ? 'Zonal Admin (${adminProvider.zonalAdminZone})'
+                          : 'Admin Dashboard',
+                      style: const TextStyle(
                         fontFamily: 'Manrope',
                         fontSize: 9,
                         color: AppColors.onSurfaceVariant,
@@ -406,32 +454,36 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   icon: Icons.dashboard_outlined,
                   label: 'Dashboard',
                 ),
-                _buildSidebarItem(
-                  icon: Icons.people_alt_outlined,
-                  label: 'Pending Approvals',
-                  badgeCount: pendingCount > 0 ? pendingCount : null,
-                ),
+                if (!adminProvider.isZonalAdmin)
+                  _buildSidebarItem(
+                    icon: Icons.people_alt_outlined,
+                    label: 'Pending Approvals',
+                    badgeCount: pendingCount > 0 ? pendingCount : null,
+                  ),
                 _buildSidebarItem(
                   icon: Icons.check_circle_outline,
-                  label: 'Approved Members',
+                  label: adminProvider.isZonalAdmin ? 'Zone Members' : 'Approved Members',
                   badgeCount: adminProvider.approvedUsers.isNotEmpty ? adminProvider.approvedUsers.length : null,
                 ),
-                _buildSidebarItem(
-                  icon: Icons.cancel_outlined,
-                  label: 'Rejected Requests',
-                  badgeCount: adminProvider.rejectedUsers.isNotEmpty ? adminProvider.rejectedUsers.length : null,
-                ),
-                _buildSidebarItem(
-                  icon: Icons.group_outlined,
-                  label: 'Committee Members',
-                ),
-                _buildSidebarItem(
-                  icon: Icons.stars_outlined,
-                  label: 'Executive Committee',
-                ),
+                if (!adminProvider.isZonalAdmin)
+                  _buildSidebarItem(
+                    icon: Icons.cancel_outlined,
+                    label: 'Rejected Requests',
+                    badgeCount: adminProvider.rejectedUsers.isNotEmpty ? adminProvider.rejectedUsers.length : null,
+                  ),
+                if (!adminProvider.isZonalAdmin) ...[
+                  _buildSidebarItem(
+                    icon: Icons.group_outlined,
+                    label: 'State Committee Members',
+                  ),
+                  _buildSidebarItem(
+                    icon: Icons.stars_outlined,
+                    label: 'Executive Committee Members',
+                  ),
+                ],
                 _buildSidebarItem(
                   icon: Icons.groups_outlined,
-                  label: 'Zonal Committee',
+                  label: 'Zonal Committee Members',
                 ),
                 _buildSidebarItem(
                   icon: Icons.description_outlined,
@@ -595,18 +647,28 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     switch (_activeTab) {
       case 'Dashboard':
         return _buildDashboardView(context);
-      case 'Pending Approvals':
-        return _buildListView(context, 'pending');
+      case 'Zone Members':
       case 'Approved Members':
         return _buildListView(context, 'approved');
+      case 'Pending Approvals':
+        if (context.read<AdminProvider>().isZonalAdmin) {
+          return _buildListView(context, 'approved');
+        }
+        return _buildListView(context, 'pending');
       case 'Rejected Requests':
+        if (context.read<AdminProvider>().isZonalAdmin) {
+          return _buildListView(context, 'approved');
+        }
         return _buildListView(context, 'rejected');
       case 'Committee Members':
       case 'State Committee':
+      case 'State Committee Members':
         return _buildCommitteeMembersView(context);
       case 'Executive Committee':
+      case 'Executive Committee Members':
         return _buildExecutiveCommitteeView(context);
       case 'Zonal Committee':
+      case 'Zonal Committee Members':
         return _buildZonalCommitteeView(context);
       case 'Meeting Minutes':
         return _buildMeetingMinutesView(context);
@@ -633,10 +695,27 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   Widget _buildDashboardView(BuildContext context) {
     final adminProvider = context.watch<AdminProvider>();
+    final zonalProvider = context.watch<ZonalProvider>();
+    final isZonalAdmin = adminProvider.isZonalAdmin;
+    final zonalZone = adminProvider.zonalAdminZone;
     final pendingNum = adminProvider.pendingUsers.length;
     final approvedNum = adminProvider.approvedUsers.length;
     final rejectedNum = adminProvider.rejectedUsers.length;
     final totalNum = pendingNum + approvedNum + rejectedNum;
+
+    final zonalCommitteeCount = zonalProvider.members.where((m) {
+      if (m.zone.toLowerCase().contains('executive')) return false;
+      if (zonalZone != null && zonalZone.isNotEmpty) {
+        final mZone = m.zone.trim().toLowerCase();
+        final aZone = zonalZone.trim().toLowerCase();
+        if (mZone == aZone) return true;
+        final mClean = mZone.replaceAll(RegExp(r'\bzone\b'), '').trim();
+        final aClean = aZone.replaceAll(RegExp(r'\bzone\b'), '').trim();
+        if (mClean.isNotEmpty && aClean.isNotEmpty && mClean == aClean) return true;
+        return mZone.contains(aZone) || aZone.contains(mZone);
+      }
+      return true;
+    }).length;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.xl),
@@ -648,15 +727,19 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             children: [
               // Welcome Cards
               Text(
-                'Welcome, ',
+                adminProvider.isZonalAdmin && adminProvider.zonalAdminZone != null
+                    ? 'Welcome, ${adminProvider.currentAdmin?.username ?? ""} (${adminProvider.zonalAdminZone} Zone)'
+                    : 'Welcome, ${adminProvider.currentAdmin?.username ?? ""}',
                 style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
-              const Text(
-                'Overview of registrations, approved members, and general association management systems.',
-                style: TextStyle(color: AppColors.onSurfaceVariant, fontSize: 13),
+              Text(
+                adminProvider.isZonalAdmin && adminProvider.zonalAdminZone != null
+                    ? 'Overview of registrations and members for ${adminProvider.zonalAdminZone} zone.'
+                    : 'Overview of registrations, approved members, and general association management systems.',
+                style: const TextStyle(color: AppColors.onSurfaceVariant, fontSize: 13),
               ),
               const SizedBox(height: AppSpacing.xl),
 
@@ -693,6 +776,43 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               // Summary Stat Cards
               LayoutBuilder(
                 builder: (context, constraints) {
+                  if (isZonalAdmin) {
+                    final cardWidth = constraints.maxWidth < 600
+                        ? constraints.maxWidth
+                        : (constraints.maxWidth - AppSpacing.lg) / 2;
+
+                    return Wrap(
+                      spacing: AppSpacing.lg,
+                      runSpacing: AppSpacing.lg,
+                      children: [
+                        _buildStatCard(
+                          title: 'Zone Members',
+                          value: approvedNum.toString(),
+                          icon: Icons.people_outline,
+                          color: Colors.green,
+                          width: cardWidth,
+                          onTap: () {
+                            setState(() {
+                              _activeTab = 'Zone Members';
+                            });
+                          },
+                        ),
+                        _buildStatCard(
+                          title: 'Zonal Committee',
+                          value: zonalCommitteeCount.toString(),
+                          icon: Icons.groups_outlined,
+                          color: AppColors.brandPrimary,
+                          width: cardWidth,
+                          onTap: () {
+                            setState(() {
+                              _activeTab = 'Zonal Committee Members';
+                            });
+                          },
+                        ),
+                      ],
+                    );
+                  }
+
                   final cardWidth = (constraints.maxWidth - (AppSpacing.lg * 3)) / 4;
                   final count = constraints.maxWidth < 600 ? 2 : 4;
 
@@ -759,27 +879,33 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Recent Registrations',
+                          isZonalAdmin ? 'Recent Zone Members' : 'Recent Registrations',
                           style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
                           ),
                         ),
                         const SizedBox(height: AppSpacing.md),
-                        adminProvider.pendingUsers.isEmpty
+                        (isZonalAdmin ? adminProvider.approvedUsers : adminProvider.pendingUsers).isEmpty
                             ? _buildCardWrapper(
                                 child: Container(
                                   padding: const EdgeInsets.all(AppSpacing.xl),
                                   alignment: Alignment.center,
-                                  child: const Text('No pending registration requests to show.'),
+                                  child: Text(
+                                    isZonalAdmin
+                                        ? 'No approved members in your zone yet.'
+                                        : 'No pending registration requests to show.',
+                                  ),
                                 ),
                               )
                             : ListView.builder(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
-                                itemCount: adminProvider.pendingUsers.length > 3 ? 3 : adminProvider.pendingUsers.length,
+                                itemCount: (isZonalAdmin ? adminProvider.approvedUsers : adminProvider.pendingUsers).length > 3
+                                    ? 3
+                                    : (isZonalAdmin ? adminProvider.approvedUsers : adminProvider.pendingUsers).length,
                                 itemBuilder: (context, index) {
-                                  final user = adminProvider.pendingUsers[index];
+                                  final user = (isZonalAdmin ? adminProvider.approvedUsers : adminProvider.pendingUsers)[index];
                                   return _buildDashboardListTile(user);
                                 },
                               ),
@@ -806,18 +932,28 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                             child: Column(
                               children: [
                                 _buildQuickActionButton(
-                                  label: 'Review Pending Requests',
-                                  icon: Icons.people_alt_outlined,
+                                  label: isZonalAdmin ? 'View Zone Members' : 'Review Pending Requests',
+                                  icon: isZonalAdmin ? Icons.people_outline : Icons.people_alt_outlined,
                                   color: AppColors.brandPrimary,
-                                  onPressed: () => setState(() => _activeTab = 'Pending Approvals'),
+                                  onPressed: () => setState(() => _activeTab = isZonalAdmin ? 'Zone Members' : 'Pending Approvals'),
                                 ),
-                                const SizedBox(height: AppSpacing.md),
-                                _buildQuickActionButton(
-                                  label: 'Manage Web Settings',
-                                  icon: Icons.settings_outlined,
-                                  color: AppColors.brandSecondary,
-                                  onPressed: () => setState(() => _activeTab = 'Settings'),
-                                ),
+                                if (isZonalAdmin) ...[
+                                  const SizedBox(height: AppSpacing.md),
+                                  _buildQuickActionButton(
+                                    label: 'Zonal Committee',
+                                    icon: Icons.groups_outlined,
+                                    color: AppColors.brandSecondary,
+                                    onPressed: () => setState(() => _activeTab = 'Zonal Committee Members'),
+                                  ),
+                                ] else ...[
+                                  const SizedBox(height: AppSpacing.md),
+                                  _buildQuickActionButton(
+                                    label: 'Manage Web Settings',
+                                    icon: Icons.settings_outlined,
+                                    color: AppColors.brandSecondary,
+                                    onPressed: () => setState(() => _activeTab = 'Settings'),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -932,12 +1068,16 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: AppColors.error.withValues(alpha: 0.08),
+              color: (user.isApproved || user.status == 'approved' ? Colors.green : AppColors.error).withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Text(
-              'Pending',
-              style: TextStyle(color: AppColors.error, fontSize: 10, fontWeight: FontWeight.bold),
+            child: Text(
+              user.isApproved || user.status == 'approved' ? 'Approved' : 'Pending',
+              style: TextStyle(
+                color: user.isApproved || user.status == 'approved' ? Colors.green : AppColors.error,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -1030,38 +1170,66 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: AppColors.brandSecondary.withValues(alpha: 0.03),
-                      borderRadius: AppRadius.borderMd,
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: adminProvider.selectedZoneFilter,
-                        icon: const Icon(Icons.filter_alt_outlined, size: 18, color: AppColors.brandPrimary),
-                        style: const TextStyle(
-                          color: AppColors.brandSecondary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
+                  if (adminProvider.isZonalAdmin)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.brandPrimary.withValues(alpha: 0.08),
+                        borderRadius: AppRadius.borderMd,
+                        border: Border.all(
+                          color: AppColors.brandPrimary.withValues(alpha: 0.2),
+                          width: 1,
                         ),
-                        onChanged: (val) {
-                          if (val != null) {
-                            adminProvider.setSelectedZoneFilter(val);
-                          }
-                        },
-                        items: [
-                          'All Zones',
-                          ...adminProvider.zones,
-                        ].map((zone) {
-                          return DropdownMenuItem<String>(
-                            value: zone,
-                            child: Text(zone == 'All Zones' ? 'All Zones' : 'Zone: $zone'),
-                          );
-                        }).toList(),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.location_on, size: 16, color: AppColors.brandPrimary),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Zone: ${adminProvider.zonalAdminZone ?? "Assigned Zone"}',
+                            style: const TextStyle(
+                              color: AppColors.brandPrimary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.brandSecondary.withValues(alpha: 0.03),
+                        borderRadius: AppRadius.borderMd,
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: adminProvider.selectedZoneFilter,
+                          icon: const Icon(Icons.filter_alt_outlined, size: 18, color: AppColors.brandPrimary),
+                          style: const TextStyle(
+                            color: AppColors.brandSecondary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          onChanged: (val) {
+                            if (val != null) {
+                              adminProvider.setSelectedZoneFilter(val);
+                            }
+                          },
+                          items: [
+                            'All Zones',
+                            ...adminProvider.zones,
+                          ].map((zone) {
+                            return DropdownMenuItem<String>(
+                              value: zone,
+                              child: Text(zone == 'All Zones' ? 'All Zones' : 'Zone: $zone'),
+                            );
+                          }).toList(),
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -1221,7 +1389,13 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                             ),
                                           ),
                                           _buildBadge(status),
-                                          const SizedBox(width: AppSpacing.sm),
+                                          const SizedBox(width: AppSpacing.xs),
+                                          IconButton(
+                                            icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 20),
+                                            tooltip: 'Delete Member',
+                                            onPressed: () => _handleDeleteUser(context, user.uid, adminProvider),
+                                          ),
+                                          const SizedBox(width: AppSpacing.xs),
                                           Icon(
                                             isExpanded ? Icons.expand_less : Icons.expand_more,
                                             color: AppColors.onSurfaceVariant,
@@ -1262,7 +1436,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                               child: _InfoTile(
                                                 icon: Icons.cake_outlined,
                                                 label: 'Date of Birth',
-                                                value: user.dateOfBirth ?? 'Not Provided',
+                                                value: AppDateFormatter.formatToDateMonthYear(user.dateOfBirth, fallback: 'Not Provided'),
                                               ),
                                             ),
                                           ],
@@ -1274,7 +1448,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                               child: _InfoTile(
                                                 icon: Icons.event_outlined,
                                                 label: 'Date of Join',
-                                                value: user.dateOfJoin ?? 'Not Provided',
+                                                value: AppDateFormatter.formatToDateMonthYear(user.dateOfJoin, fallback: 'Not Provided'),
                                               ),
                                             ),
                                             Expanded(
@@ -1293,7 +1467,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                               child: _InfoTile(
                                                 icon: Icons.work_off_outlined,
                                                 label: 'Date of Retirement',
-                                                value: user.dateOfRetirement ?? 'Not Provided',
+                                                value: AppDateFormatter.formatToDateMonthYear(user.dateOfRetirement, fallback: 'Not Provided'),
                                               ),
                                             ),
                                             const Expanded(child: SizedBox()),
@@ -1392,15 +1566,15 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                             ],
                                           ),
                                         ),
-                                        if (status == 'pending') ...[
-                                          const SizedBox(height: AppSpacing.xl),
-                                          Row(
-                                            children: [
+                                        const SizedBox(height: AppSpacing.xl),
+                                        Row(
+                                          children: [
+                                            if (status == 'pending') ...[
                                               Expanded(
                                                 child: OutlinedButton.icon(
                                                   style: OutlinedButton.styleFrom(
-                                                    foregroundColor: AppColors.error,
-                                                    side: const BorderSide(color: AppColors.error),
+                                                    foregroundColor: Colors.orange.shade800,
+                                                    side: BorderSide(color: Colors.orange.shade800),
                                                     padding: const EdgeInsets.symmetric(vertical: 12),
                                                   ),
                                                   onPressed: () => _handleReject(context, user.uid, adminProvider),
@@ -1408,7 +1582,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                                   label: const Text('Reject'),
                                                 ),
                                               ),
-                                              const SizedBox(width: AppSpacing.md),
+                                              const SizedBox(width: AppSpacing.sm),
                                               Expanded(
                                                 child: ElevatedButton.icon(
                                                   style: ElevatedButton.styleFrom(
@@ -1421,9 +1595,22 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                                   label: const Text('Approve'),
                                                 ),
                                               ),
+                                              const SizedBox(width: AppSpacing.sm),
                                             ],
-                                          ),
-                                        ],
+                                            Expanded(
+                                              child: OutlinedButton.icon(
+                                                style: OutlinedButton.styleFrom(
+                                                  foregroundColor: AppColors.error,
+                                                  side: const BorderSide(color: AppColors.error),
+                                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                                ),
+                                                onPressed: () => _handleDeleteUser(context, user.uid, adminProvider),
+                                                icon: const Icon(Icons.delete_outline, size: 18),
+                                                label: const Text('Delete Member'),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ],
                                     ],
                                   ),
@@ -1498,17 +1685,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   padding: const EdgeInsets.all(AppSpacing.xl),
                   child: Column(
                     children: [
-                      SwitchListTile.adaptive(
-                        title: const Text(
-                          'Auto-Approve Registrations',
-                          style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.brandSecondary),
-                        ),
-                        subtitle: const Text('Bypasses human verification (Not Recommended for Production)'),
-                        value: _autoApprove,
-                        activeColor: AppColors.brandPrimary,
-                        onChanged: (val) => setState(() => _autoApprove = val),
-                      ),
-                      const Divider(height: 32),
+
                       ListTile(
                         title: const Text(
                           'Security Clearance Level',
@@ -1587,7 +1764,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Members Management',
+                'State Committee Members Management',
                 style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold),
               ),
               ElevatedButton.icon(
@@ -1809,9 +1986,30 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   // Meeting Minutes Administration
   // ==========================================
 
+  bool _isItemInZonalAdminZone(String? itemZone, String? adminZone) {
+    if (adminZone == null || adminZone.trim().isEmpty) return false;
+    if (itemZone == null || itemZone.trim().isEmpty) return false;
+    final i = itemZone.trim().toLowerCase();
+    final a = adminZone.trim().toLowerCase();
+    if (i == a) return true;
+    final iClean = i.replaceAll(RegExp(r'\bzone\b'), '').trim();
+    final aClean = a.replaceAll(RegExp(r'\bzone\b'), '').trim();
+    if (iClean.isNotEmpty && aClean.isNotEmpty && iClean == aClean) return true;
+    return i.contains(a) || a.contains(i);
+  }
+
   Widget _buildMeetingMinutesView(BuildContext context) {
     final provider = context.watch<MeetingMinutesProvider>();
-    final minutes = provider.minutesList;
+    final adminProvider = context.watch<AdminProvider>();
+    final isZonalAdmin = adminProvider.isZonalAdmin;
+    final adminZone = adminProvider.zonalAdminZone;
+
+    final minutes = provider.minutesList.where((m) {
+      if (isZonalAdmin) {
+        return _isItemInZonalAdminZone(m.zone, adminZone);
+      }
+      return true;
+    }).toList();
 
     return Column(
       children: [
@@ -1982,13 +2180,17 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     String pdfName = minutes?.pdfName ?? '';
     Uint8List? pdfBytes;
 
+    final adminProv = context.read<AdminProvider>();
+    final isZonalAdmin = adminProv.isZonalAdmin;
+    final adminZone = adminProv.zonalAdminZone;
+
     showDialog(
       context: context,
       builder: (dialogCtx) {
         bool isSaving = false;
-        String selectedSection = minutes?.section ?? 'all';
-        String selectedZone = minutes?.zone ?? '';
-        final zonesList = context.read<AdminProvider>().zones;
+        String selectedSection = isZonalAdmin ? 'zonal' : (minutes?.section ?? 'all');
+        String selectedZone = isZonalAdmin ? (adminZone ?? '') : (minutes?.zone ?? '');
+        final zonesList = adminProv.zones;
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
@@ -2004,42 +2206,62 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: selectedSection,
-                      decoration: const InputDecoration(labelText: 'Section *'),
-                      items: const [
-                        DropdownMenuItem(value: 'all', child: Text('All')),
-                        DropdownMenuItem(value: 'state', child: Text('State')),
-                        DropdownMenuItem(value: 'executive', child: Text('Executive')),
-                        DropdownMenuItem(value: 'zonal', child: Text('Zonal')),
-                      ],
-                      onChanged: isSaving ? null : (val) {
-                        if (val != null) {
-                          setDialogState(() {
-                            selectedSection = val;
-                          });
-                        }
-                      },
-                    ),
-                    if (selectedSection == 'zonal') ...[
-                      const SizedBox(height: 12),
+                    if (isZonalAdmin) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: AppRadius.borderMd,
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Section: Zonal', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.brandSecondary)),
+                            const SizedBox(height: 2),
+                            Text('Zone: ${adminZone ?? ""}', style: const TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant)),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
                       DropdownButtonFormField<String>(
-                        value: selectedZone.isNotEmpty && zonesList.contains(selectedZone)
-                            ? selectedZone
-                            : (zonesList.isNotEmpty ? zonesList.first : null),
-                        decoration: const InputDecoration(labelText: 'Select Zone *'),
-                        items: zonesList.isEmpty
-                            ? []
-                            : zonesList.map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
-                        validator: (v) => selectedSection == 'zonal' && (v == null || v.isEmpty) ? 'Required' : null,
+                        value: selectedSection,
+                        decoration: const InputDecoration(labelText: 'Section *'),
+                        items: const [
+                          DropdownMenuItem(value: 'all', child: Text('All')),
+                          DropdownMenuItem(value: 'state', child: Text('State')),
+                          DropdownMenuItem(value: 'executive', child: Text('Executive')),
+                          DropdownMenuItem(value: 'zonal', child: Text('Zonal')),
+                        ],
                         onChanged: isSaving ? null : (val) {
                           if (val != null) {
                             setDialogState(() {
-                              selectedZone = val;
+                              selectedSection = val;
                             });
                           }
                         },
                       ),
+                      if (selectedSection == 'zonal') ...[
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: selectedZone.isNotEmpty && zonesList.contains(selectedZone)
+                              ? selectedZone
+                              : (zonesList.isNotEmpty ? zonesList.first : null),
+                          decoration: const InputDecoration(labelText: 'Select Zone *'),
+                          items: zonesList.isEmpty
+                              ? []
+                              : zonesList.map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
+                          validator: (v) => selectedSection == 'zonal' && (v == null || v.isEmpty) ? 'Required' : null,
+                          onChanged: isSaving ? null : (val) {
+                            if (val != null) {
+                              setDialogState(() {
+                                selectedZone = val;
+                              });
+                            }
+                          },
+                        ),
+                      ],
                     ],
                     const SizedBox(height: 12),
                     TextFormField(
@@ -2116,12 +2338,14 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                           pdfUrl: minutes?.pdfUrl ?? '',
                           status: minutes?.status ?? 'pending',
                           createdAt: minutes?.createdAt ?? DateTime.now().toIso8601String(),
-                          section: selectedSection,
-                          zone: selectedSection == 'zonal'
-                              ? (selectedZone.isNotEmpty && zonesList.contains(selectedZone)
-                                  ? selectedZone
-                                  : (zonesList.isNotEmpty ? zonesList.first : ''))
-                              : '',
+                          section: isZonalAdmin ? 'zonal' : selectedSection,
+                          zone: isZonalAdmin
+                              ? (adminZone ?? '')
+                              : (selectedSection == 'zonal'
+                                  ? (selectedZone.isNotEmpty && zonesList.contains(selectedZone)
+                                      ? selectedZone
+                                      : (zonesList.isNotEmpty ? zonesList.first : ''))
+                                  : ''),
                         );
                         bool success;
                         if (minutes == null) {
@@ -2169,7 +2393,16 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   Widget _buildGovernmentOrdersView(BuildContext context) {
     final provider = context.watch<GovernmentOrdersProvider>();
-    final orders = provider.orders;
+    final adminProvider = context.watch<AdminProvider>();
+    final isZonalAdmin = adminProvider.isZonalAdmin;
+    final adminZone = adminProvider.zonalAdminZone;
+
+    final orders = provider.orders.where((o) {
+      if (isZonalAdmin) {
+        return _isItemInZonalAdminZone(o.zone, adminZone);
+      }
+      return true;
+    }).toList();
 
     return Column(
       children: [
@@ -2316,14 +2549,17 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final dateCtrl = TextEditingController(text: order?.date ?? '');
     String pdfName = order?.pdfName ?? '';
     Uint8List? pdfBytes;
-    bool isSaving = false;
-    String selectedSection = order?.section ?? 'all';
-    String selectedZone = order?.zone ?? '';
-    final zonesList = context.read<AdminProvider>().zones;
+    final adminProv = context.read<AdminProvider>();
+    final isZonalAdmin = adminProv.isZonalAdmin;
+    final adminZone = adminProv.zonalAdminZone;
 
     showDialog(
       context: context,
       builder: (dialogCtx) {
+        bool isSaving = false;
+        String selectedSection = isZonalAdmin ? 'zonal' : (order?.section ?? 'all');
+        String selectedZone = isZonalAdmin ? (adminZone ?? '') : (order?.zone ?? '');
+        final zonesList = adminProv.zones;
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
@@ -2340,42 +2576,62 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       enabled: !isSaving,
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: selectedSection,
-                      decoration: const InputDecoration(labelText: 'Section *'),
-                      items: const [
-                        DropdownMenuItem(value: 'all', child: Text('All')),
-                        DropdownMenuItem(value: 'state', child: Text('State')),
-                        DropdownMenuItem(value: 'executive', child: Text('Executive')),
-                        DropdownMenuItem(value: 'zonal', child: Text('Zonal')),
-                      ],
-                      onChanged: isSaving ? null : (val) {
-                        if (val != null) {
-                          setDialogState(() {
-                            selectedSection = val;
-                          });
-                        }
-                      },
-                    ),
-                    if (selectedSection == 'zonal') ...[
-                      const SizedBox(height: 12),
+                    if (isZonalAdmin) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: AppRadius.borderMd,
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Section: Zonal', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.brandSecondary)),
+                            const SizedBox(height: 2),
+                            Text('Zone: ${adminZone ?? ""}', style: const TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant)),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
                       DropdownButtonFormField<String>(
-                        value: selectedZone.isNotEmpty && zonesList.contains(selectedZone)
-                            ? selectedZone
-                            : (zonesList.isNotEmpty ? zonesList.first : null),
-                        decoration: const InputDecoration(labelText: 'Select Zone *'),
-                        items: zonesList.isEmpty
-                            ? []
-                            : zonesList.map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
-                        validator: (v) => selectedSection == 'zonal' && (v == null || v.isEmpty) ? 'Required' : null,
+                        value: selectedSection,
+                        decoration: const InputDecoration(labelText: 'Section *'),
+                        items: const [
+                          DropdownMenuItem(value: 'all', child: Text('All')),
+                          DropdownMenuItem(value: 'state', child: Text('State')),
+                          DropdownMenuItem(value: 'executive', child: Text('Executive')),
+                          DropdownMenuItem(value: 'zonal', child: Text('Zonal')),
+                        ],
                         onChanged: isSaving ? null : (val) {
                           if (val != null) {
                             setDialogState(() {
-                              selectedZone = val;
+                              selectedSection = val;
                             });
                           }
                         },
                       ),
+                      if (selectedSection == 'zonal') ...[
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: selectedZone.isNotEmpty && zonesList.contains(selectedZone)
+                              ? selectedZone
+                              : (zonesList.isNotEmpty ? zonesList.first : null),
+                          decoration: const InputDecoration(labelText: 'Select Zone *'),
+                          items: zonesList.isEmpty
+                              ? []
+                              : zonesList.map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
+                          validator: (v) => selectedSection == 'zonal' && (v == null || v.isEmpty) ? 'Required' : null,
+                          onChanged: isSaving ? null : (val) {
+                            if (val != null) {
+                              setDialogState(() {
+                                selectedZone = val;
+                              });
+                            }
+                          },
+                        ),
+                      ],
                     ],
                     const SizedBox(height: 12),
                     TextFormField(
@@ -2459,12 +2715,14 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                           pdfName: pdfName,
                           pdfUrl: order?.pdfUrl ?? '',
                           createdAt: order?.createdAt ?? DateTime.now().toIso8601String(),
-                          section: selectedSection,
-                          zone: selectedSection == 'zonal'
-                              ? (selectedZone.isNotEmpty && zonesList.contains(selectedZone)
-                                  ? selectedZone
-                                  : (zonesList.isNotEmpty ? zonesList.first : ''))
-                              : '',
+                          section: isZonalAdmin ? 'zonal' : selectedSection,
+                          zone: isZonalAdmin
+                              ? (adminZone ?? '')
+                              : (selectedSection == 'zonal'
+                                  ? (selectedZone.isNotEmpty && zonesList.contains(selectedZone)
+                                      ? selectedZone
+                                      : (zonesList.isNotEmpty ? zonesList.first : ''))
+                                  : ''),
                         );
                         bool success;
                         if (order == null) {
@@ -2833,7 +3091,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Executive Committee Management',
+                'Executive Committee Members Management',
                 style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold),
               ),
               ElevatedButton.icon(
@@ -2938,7 +3196,23 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   Widget _buildZonalCommitteeView(BuildContext context) {
     final provider = context.watch<ZonalProvider>();
-    final members = provider.members.where((m) => !m.zone.toLowerCase().contains('executive')).toList();
+    final adminProvider = context.watch<AdminProvider>();
+    final isZonalAdmin = adminProvider.isZonalAdmin;
+    final adminZone = adminProvider.zonalAdminZone;
+
+    final members = provider.members.where((m) {
+      if (m.zone.toLowerCase().contains('executive')) return false;
+      if (isZonalAdmin && adminZone != null && adminZone.isNotEmpty) {
+        final mZone = m.zone.trim().toLowerCase();
+        final aZone = adminZone.trim().toLowerCase();
+        if (mZone == aZone) return true;
+        final mClean = mZone.replaceAll(RegExp(r'\bzone\b'), '').trim();
+        final aClean = aZone.replaceAll(RegExp(r'\bzone\b'), '').trim();
+        if (mClean.isNotEmpty && aClean.isNotEmpty && mClean == aClean) return true;
+        return mZone.contains(aZone) || aZone.contains(mZone);
+      }
+      return true;
+    }).toList();
 
     return Column(
       children: [
@@ -2952,7 +3226,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Zonal Committee Management',
+                'Zonal Committee Members Management',
                 style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold),
               ),
               ElevatedButton.icon(
@@ -3069,10 +3343,18 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       selectedDesignation = designations.first;
     }
 
-    final rawZones = context.read<AdminProvider>().zones;
+    final adminProv = context.read<AdminProvider>();
+    final isZonalAdmin = adminProv.isZonalAdmin;
+    final zonalZone = adminProv.zonalAdminZone;
+
+    final rawZones = adminProv.zones;
     final availableZonalZones = rawZones.where((z) => !z.toLowerCase().contains('executive')).toList();
-    if (!isExecutive && (selectedZone == null || selectedZone.toLowerCase().contains('executive')) && availableZonalZones.isNotEmpty) {
-      selectedZone = availableZonalZones.first;
+    if (!isExecutive) {
+      if (isZonalAdmin && zonalZone != null && zonalZone.isNotEmpty) {
+        selectedZone = zonalZone;
+      } else if ((selectedZone == null || selectedZone.toLowerCase().contains('executive')) && availableZonalZones.isNotEmpty) {
+        selectedZone = availableZonalZones.first;
+      }
     }
 
     showDialog(
@@ -3130,6 +3412,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                           initialValue: 'Executive Committee',
                           enabled: false,
                           decoration: const InputDecoration(labelText: 'Committee Section'),
+                        ),
+                      ] else if (isZonalAdmin) ...[
+                        TextFormField(
+                          initialValue: selectedZone,
+                          enabled: false,
+                          decoration: const InputDecoration(labelText: 'Assigned Zone'),
                         ),
                       ] else ...[
                         DropdownButtonFormField<String>(
@@ -3900,7 +4188,16 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   Widget _buildEducationalVideosView(BuildContext context) {
     final provider = context.watch<VideoProvider>();
-    final videos = provider.videosList;
+    final adminProvider = context.watch<AdminProvider>();
+    final isZonalAdmin = adminProvider.isZonalAdmin;
+    final adminZone = adminProvider.zonalAdminZone;
+
+    final videos = provider.videosList.where((v) {
+      if (isZonalAdmin) {
+        return _isItemInZonalAdminZone(v.zone, adminZone);
+      }
+      return true;
+    }).toList();
 
     return Column(
       children: [
@@ -4049,17 +4346,19 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
     Uint8List? thumbnailBytes;
     String thumbnailName = video?.thumbnailUrl.isNotEmpty == true ? video!.thumbnailUrl.split('/').last.split('?').first : '';
-
-    bool isSaving = false;
-    double videoProgress = 0.0;
-    double thumbnailProgress = 0.0;
-    String selectedSection = video?.section ?? 'all';
-    String selectedZone = video?.zone ?? '';
-    final zonesList = context.read<AdminProvider>().zones;
+    final adminProv = context.read<AdminProvider>();
+    final isZonalAdmin = adminProv.isZonalAdmin;
+    final adminZone = adminProv.zonalAdminZone;
 
     showDialog(
       context: context,
       builder: (dialogCtx) {
+        bool isSaving = false;
+        double videoProgress = 0.0;
+        double thumbnailProgress = 0.0;
+        String selectedSection = isZonalAdmin ? 'zonal' : (video?.section ?? 'all');
+        String selectedZone = isZonalAdmin ? (adminZone ?? '') : (video?.zone ?? '');
+        final zonesList = adminProv.zones;
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
@@ -4076,42 +4375,62 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                       ),
                       const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: selectedSection,
-                        decoration: const InputDecoration(labelText: 'Section *'),
-                        items: const [
-                          DropdownMenuItem(value: 'all', child: Text('All')),
-                          DropdownMenuItem(value: 'state', child: Text('State')),
-                          DropdownMenuItem(value: 'executive', child: Text('Executive')),
-                          DropdownMenuItem(value: 'zonal', child: Text('Zonal')),
-                        ],
-                        onChanged: isSaving ? null : (val) {
-                          if (val != null) {
-                            setDialogState(() {
-                              selectedSection = val;
-                            });
-                          }
-                        },
-                      ),
-                      if (selectedSection == 'zonal') ...[
-                        const SizedBox(height: 12),
+                      if (isZonalAdmin) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: AppRadius.borderMd,
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Section: Zonal', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.brandSecondary)),
+                              const SizedBox(height: 2),
+                              Text('Zone: ${adminZone ?? ""}', style: const TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant)),
+                            ],
+                          ),
+                        ),
+                      ] else ...[
                         DropdownButtonFormField<String>(
-                          value: selectedZone.isNotEmpty && zonesList.contains(selectedZone)
-                              ? selectedZone
-                              : (zonesList.isNotEmpty ? zonesList.first : null),
-                          decoration: const InputDecoration(labelText: 'Select Zone *'),
-                          items: zonesList.isEmpty
-                              ? []
-                              : zonesList.map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
-                          validator: (v) => selectedSection == 'zonal' && (v == null || v.isEmpty) ? 'Required' : null,
+                          value: selectedSection,
+                          decoration: const InputDecoration(labelText: 'Section *'),
+                          items: const [
+                            DropdownMenuItem(value: 'all', child: Text('All')),
+                            DropdownMenuItem(value: 'state', child: Text('State')),
+                            DropdownMenuItem(value: 'executive', child: Text('Executive')),
+                            DropdownMenuItem(value: 'zonal', child: Text('Zonal')),
+                          ],
                           onChanged: isSaving ? null : (val) {
                             if (val != null) {
                               setDialogState(() {
-                                              selectedZone = val;
+                                selectedSection = val;
                               });
                             }
                           },
                         ),
+                        if (selectedSection == 'zonal') ...[
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String>(
+                            value: selectedZone.isNotEmpty && zonesList.contains(selectedZone)
+                                ? selectedZone
+                                : (zonesList.isNotEmpty ? zonesList.first : null),
+                            decoration: const InputDecoration(labelText: 'Select Zone *'),
+                            items: zonesList.isEmpty
+                                ? []
+                                : zonesList.map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
+                            validator: (v) => selectedSection == 'zonal' && (v == null || v.isEmpty) ? 'Required' : null,
+                            onChanged: isSaving ? null : (val) {
+                              if (val != null) {
+                                setDialogState(() {
+                                  selectedZone = val;
+                                });
+                              }
+                            },
+                          ),
+                        ],
                       ],
                       const SizedBox(height: 16),
                       // Video Selector Row
@@ -4243,12 +4562,14 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                 thumbnailUrl: video?.thumbnailUrl ?? '',
                                 duration: video?.duration ?? 0,
                                 createdAt: video?.createdAt ?? DateTime.now().toIso8601String(),
-                                section: selectedSection,
-                                zone: selectedSection == 'zonal'
-                                    ? (selectedZone.isNotEmpty && zonesList.contains(selectedZone)
-                                        ? selectedZone
-                                        : (zonesList.isNotEmpty ? zonesList.first : ''))
-                                    : '',
+                                section: isZonalAdmin ? 'zonal' : selectedSection,
+                                zone: isZonalAdmin
+                                    ? (adminZone ?? '')
+                                    : (selectedSection == 'zonal'
+                                        ? (selectedZone.isNotEmpty && zonesList.contains(selectedZone)
+                                            ? selectedZone
+                                            : (zonesList.isNotEmpty ? zonesList.first : ''))
+                                        : ''),
                               );
                               
                               bool success;

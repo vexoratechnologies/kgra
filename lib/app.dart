@@ -16,6 +16,8 @@ import 'features/gallery/presentation/providers/gallery_provider.dart';
 import 'features/videos/presentation/providers/video_provider.dart';
 import 'features/ads/presentation/providers/ad_provider.dart';
 import 'features/events/presentation/providers/event_provider.dart';
+import 'core/update/app_version_service.dart';
+import 'core/update/force_update_screen.dart';
 import 'injection.dart';
 
 /// The root App widget of the My KGRA Mobile Application.
@@ -76,6 +78,22 @@ class App extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         routerConfig: AppRoutes.router,
+        builder: (context, child) {
+          return ValueListenableBuilder<ForceUpdateConfig?>(
+            valueListenable: AppVersionService.instance.updateConfigNotifier,
+            builder: (context, updateConfig, _) {
+              if (updateConfig != null) {
+                return ForceUpdateScreen(
+                  message: updateConfig.message,
+                  buttonText: updateConfig.buttonText,
+                  storeUrl: updateConfig.storeUrl,
+                  currentVersion: '${AppVersionService.instance.currentVersionName}+${AppVersionService.instance.currentBuildNumber}',
+                );
+              }
+              return child ?? const SizedBox.shrink();
+            },
+          );
+        },
       ),
     );
   }

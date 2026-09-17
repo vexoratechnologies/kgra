@@ -346,14 +346,10 @@ class FirestoreService {
         .collection(FirestoreCollections.zones)
         .orderBy('createdAt', descending: true)
         .get();
-    final list = querySnapshot.docs
+    return querySnapshot.docs
         .map((doc) => doc.data()['name'] as String? ?? '')
         .where((name) => name.isNotEmpty)
         .toList();
-    if (!list.contains('Executive Committee')) {
-      list.insert(0, 'Executive Committee');
-    }
-    return list;
   }
 
   Future<void> deleteZone(String name) async {
@@ -725,9 +721,9 @@ class FirestoreService {
   }
 
   /// Read-only preview of the next membership ID for a zone without incrementing.
+  /// Uses a shared global sequential counter across all zones.
   Future<String> peekNextMembershipId(String zone) async {
     final details = getZoneDetails(zone);
-    final code = details['code']!;
     final prefix = details['prefix']!;
 
     try {
@@ -738,26 +734,26 @@ class FirestoreService {
 
       int currentCount = 0;
       if (docSnapshot.exists && docSnapshot.data() != null) {
-        currentCount = (docSnapshot.data()![code] as num?)?.toInt() ?? 0;
+        final data = docSnapshot.data()!;
+        currentCount = (data['global_counter'] as num?)?.toInt() ?? 0;
       }
 
       if (currentCount == 0) {
-        currentCount = await _findMaxMembershipSeqFromUsers(prefix);
+        currentCount = await _findMaxMembershipSeqFromUsers();
       }
 
       final nextSeq = currentCount + 1;
       return '$prefix${nextSeq.toString().padLeft(2, '0')}';
     } catch (e) {
       debugPrint('Error peeking next membership ID: $e');
-      final fallbackSeq = (await _findMaxMembershipSeqFromUsers(prefix)) + 1;
+      final fallbackSeq = (await _findMaxMembershipSeqFromUsers()) + 1;
       return '$prefix${fallbackSeq.toString().padLeft(2, '0')}';
     }
   }
 
-  /// Atomically increments and returns the next membership ID for a given zone using Firestore Transaction.
+  /// Atomically increments and returns the next membership ID using a shared global sequence across all zones.
   Future<String> generateNextMembershipId(String zone) async {
     final details = getZoneDetails(zone);
-    final code = details['code']!;
     final prefix = details['prefix']!;
     final docRef = _firestore
         .collection(FirestoreCollections.counters)
@@ -768,17 +764,18 @@ class FirestoreService {
         final snapshot = await transaction.get(docRef);
         int currentCount = 0;
         if (snapshot.exists && snapshot.data() != null) {
-          currentCount = (snapshot.data()![code] as num?)?.toInt() ?? 0;
+          final data = snapshot.data()!;
+          currentCount = (data['global_counter'] as num?)?.toInt() ?? 0;
         }
 
         if (currentCount == 0) {
-          currentCount = await _findMaxMembershipSeqFromUsers(prefix);
+          currentCount = await _findMaxMembershipSeqFromUsers();
         }
 
         final newCount = currentCount + 1;
         transaction.set(
           docRef,
-          {code: newCount},
+          {'global_counter': newCount},
           SetOptions(merge: true),
         );
         return newCount;
@@ -787,20 +784,20 @@ class FirestoreService {
       return '$prefix${nextSeq.toString().padLeft(2, '0')}';
     } catch (e) {
       debugPrint('Error generating next membership ID in transaction: $e');
-      final fallbackSeq = (await _findMaxMembershipSeqFromUsers(prefix)) + 1;
+      final fallbackSeq = (await _findMaxMembershipSeqFromUsers()) + 1;
       return '$prefix${fallbackSeq.toString().padLeft(2, '0')}';
     }
   }
 
-  /// Internal helper to find highest numeric sequence from USERS collection for a zone prefix
-  Future<int> _findMaxMembershipSeqFromUsers(String prefix) async {
+  /// Internal helper to find highest numeric sequence from USERS collection across all zones
+  Future<int> _findMaxMembershipSeqFromUsers() async {
     try {
       final usersSnap = await _firestore.collection(FirestoreCollections.users).get();
       int maxNum = 0;
       final regExp = RegExp(r'(\d+)$');
       for (final doc in usersSnap.docs) {
         final memId = doc.data()['membershipId'] as String?;
-        if (memId != null && memId.startsWith(prefix)) {
+        if (memId != null && memId.isNotEmpty) {
           final match = regExp.firstMatch(memId);
           if (match != null) {
             final numVal = int.tryParse(match.group(1) ?? '');

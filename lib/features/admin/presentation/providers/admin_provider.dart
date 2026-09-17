@@ -23,7 +23,7 @@ class AdminProvider extends ChangeNotifier {
 
   AdminModel? _currentAdmin;
   List<AdminModel> _admins = [];
-  List<String> _zones = ['Executive Committee'];
+  List<String> _zones = [];
   List<String> _designations = [];
 
   List<UserModel> _pendingUsers = [];
@@ -38,74 +38,94 @@ class AdminProvider extends ChangeNotifier {
   final Set<String> _loadingImageUids = {};
 
   AdminModel? get currentAdmin => _currentAdmin;
+  bool get isZonalAdmin => _currentAdmin != null && _currentAdmin!.role == 'zonal_admin';
+  String? get zonalAdminZone => _currentAdmin?.zone;
   List<AdminModel> get admins => _admins;
   List<String> get zones => _zones;
   List<String> get designations => _designations;
-  String get selectedZoneFilter => _selectedZoneFilter;
+  String get selectedZoneFilter {
+    if (isZonalAdmin && zonalAdminZone != null && zonalAdminZone!.isNotEmpty) {
+      return zonalAdminZone!;
+    }
+    return _selectedZoneFilter;
+  }
 
   void setSelectedZoneFilter(String zone) {
+    if (isZonalAdmin) {
+      _selectedZoneFilter = zonalAdminZone ?? '';
+      return;
+    }
     _selectedZoneFilter = zone;
     notifyListeners();
   }
 
+  /// Helper to check if a user's zone matches the target zone
+  bool _matchesZone(String? userZone, String targetZone) {
+    if (targetZone.trim().isEmpty || targetZone == 'All Zones') {
+      return true;
+    }
+    if (userZone == null || userZone.trim().isEmpty || userZone == 'null') {
+      return false;
+    }
+    final uZone = userZone.trim().toLowerCase();
+    final tZone = targetZone.trim().toLowerCase();
+    if (uZone == tZone) return true;
+
+    // Compare without the word 'zone'
+    final uClean = uZone.replaceAll(RegExp(r'\bzone\b'), '').trim();
+    final tClean = tZone.replaceAll(RegExp(r'\bzone\b'), '').trim();
+    if (uClean.isNotEmpty && tClean.isNotEmpty && uClean == tClean) {
+      return true;
+    }
+
+    // Word boundary match
+    final query = tClean.isNotEmpty ? tClean : tZone;
+    final regex = RegExp(r'\b' + RegExp.escape(query) + r'\b');
+    return regex.hasMatch(uZone);
+  }
+
   List<UserModel> get pendingUsers {
-    debugPrint('pendingUsers called. Total raw users: ${_pendingUsers.length}');
+    if (isZonalAdmin) {
+      return []; // Zonal Admins do not manage pending registration requests (handled by Super Admin)
+    }
     if (_selectedZoneFilter == 'All Zones' || _selectedZoneFilter.isEmpty) {
       return _pendingUsers;
     }
-    final targetZone = _selectedZoneFilter.trim().toLowerCase();
+    final targetZone = _selectedZoneFilter.trim();
     debugPrint('Filtering pending users for selected zone filter: "$targetZone"');
-    final filtered = _pendingUsers.where((u) {
-      final userZone = u.zone?.trim().toLowerCase();
-      if (userZone == null || userZone.isEmpty || userZone == 'null') {
-        return true; // Show users with unassigned zone
-      }
-      final matches = (userZone == targetZone) ||
-          userZone.contains(targetZone) ||
-          targetZone.contains(userZone);
-      debugPrint('  User: ${u.name}, Zone: "${u.zone}" -> matches: $matches');
-      return matches;
-    }).toList();
+    final filtered = _pendingUsers.where((u) => _matchesZone(u.zone, targetZone)).toList();
     debugPrint('Filtered pending users count: ${filtered.length}');
     return filtered;
   }
 
   List<UserModel> get approvedUsers {
     debugPrint('approvedUsers called. Total raw users: ${_approvedUsers.length}');
+    if (isZonalAdmin) {
+      final zone = zonalAdminZone;
+      if (zone == null || zone.trim().isEmpty) return [];
+      final filtered = _approvedUsers.where((u) => _matchesZone(u.zone, zone)).toList();
+      debugPrint('Zonal Admin ($zone) approved users count: ${filtered.length}');
+      return filtered;
+    }
     if (_selectedZoneFilter == 'All Zones' || _selectedZoneFilter.isEmpty) {
       return _approvedUsers;
     }
-    final targetZone = _selectedZoneFilter.trim().toLowerCase();
+    final targetZone = _selectedZoneFilter.trim();
     debugPrint('Filtering approved users for selected zone filter: "$targetZone"');
-    final filtered = _approvedUsers.where((u) {
-      final userZone = u.zone?.trim().toLowerCase();
-      if (userZone == null || userZone.isEmpty || userZone == 'null') {
-        return true;
-      }
-      final matches = (userZone == targetZone) ||
-          userZone.contains(targetZone) ||
-          targetZone.contains(userZone);
-      debugPrint('  User: ${u.name}, Zone: "${u.zone}" -> matches: $matches');
-      return matches;
-    }).toList();
+    final filtered = _approvedUsers.where((u) => _matchesZone(u.zone, targetZone)).toList();
     debugPrint('Filtered approved users count: ${filtered.length}');
     return filtered;
   }
 
   List<UserModel> get rejectedUsers {
+    if (isZonalAdmin) {
+      return []; // Zonal Admins only see active approved zone members
+    }
     if (_selectedZoneFilter == 'All Zones' || _selectedZoneFilter.isEmpty) {
       return _rejectedUsers;
     }
-    final targetZone = _selectedZoneFilter.trim().toLowerCase();
-    return _rejectedUsers.where((u) {
-      final userZone = u.zone?.trim().toLowerCase();
-      if (userZone == null || userZone.isEmpty || userZone == 'null') {
-        return true;
-      }
-      return (userZone == targetZone) ||
-          userZone.contains(targetZone) ||
-          targetZone.contains(userZone);
-    }).toList();
+    final targetZone = _selectedZoneFilter.trim();
+    return _rejectedUsers.where((u) => _matchesZone(u.zone, targetZone)).toList();
   }
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -137,6 +157,9 @@ class AdminProvider extends ChangeNotifier {
       if (jsonStr != null && jsonStr.isNotEmpty) {
         final decoded = jsonDecode(jsonStr);
         _currentAdmin = AdminModel.fromJson(Map<String, dynamic>.from(decoded));
+        if (_currentAdmin?.role == 'zonal_admin' && _currentAdmin?.zone != null && _currentAdmin!.zone!.isNotEmpty) {
+          _selectedZoneFilter = _currentAdmin!.zone!;
+        }
         notifyListeners();
       }
     } catch (e) {
@@ -162,6 +185,11 @@ class AdminProvider extends ChangeNotifier {
           return false;
         }
         _currentAdmin = admin;
+        if (admin.role == 'zonal_admin' && admin.zone != null && admin.zone!.isNotEmpty) {
+          _selectedZoneFilter = admin.zone!;
+        } else {
+          _selectedZoneFilter = 'All Zones';
+        }
         
         // Cache admin session details locally
         final jsonStr = jsonEncode(admin.toJson());
@@ -183,6 +211,7 @@ class AdminProvider extends ChangeNotifier {
   /// Clears active admin session.
   void logoutAdmin() {
     _currentAdmin = null;
+    _selectedZoneFilter = 'All Zones';
     _prefs.remove(_cachedAdminKey);
     notifyListeners();
   }
@@ -298,6 +327,23 @@ class AdminProvider extends ChangeNotifier {
     }
   }
 
+  /// Deletes a member permanently from database.
+  Future<bool> deleteUser(String uid) async {
+    _setError(null);
+    try {
+      await _adminRepository.deleteUser(uid);
+      _pendingUsers.removeWhere((u) => u.uid == uid);
+      _approvedUsers.removeWhere((u) => u.uid == uid);
+      _rejectedUsers.removeWhere((u) => u.uid == uid);
+      _userImages.remove(uid);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _setError('Failed to delete user: ${e.toString()}');
+      return false;
+    }
+  }
+
   /// Lazy-loads user profile image base64 on-demand.
   Future<void> fetchUserImage(String profileImageId, String userUid) async {
     if (profileImageId.startsWith('http')) return;
@@ -368,12 +414,7 @@ class AdminProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       final fetched = await _adminRepository.getZones();
-      final list = <String>[];
-      if (!fetched.contains('Executive Committee')) {
-        list.add('Executive Committee');
-      }
-      list.addAll(fetched);
-      _zones = list;
+      _zones = fetched;
     } catch (e) {
       _setError('Failed to fetch zones: ${e.toString()}');
     } finally {
