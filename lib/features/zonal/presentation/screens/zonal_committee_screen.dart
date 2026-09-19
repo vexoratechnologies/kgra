@@ -9,8 +9,6 @@ import '../../../admin/presentation/providers/admin_provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/widgets/compact_app_bar.dart';
-import '../providers/zonal_provider.dart';
-
 /// ZonalCommitteeScreen renders the list of zonal committee members for members.
 class ZonalCommitteeScreen extends StatefulWidget {
   const ZonalCommitteeScreen({super.key});
@@ -28,7 +26,7 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ZonalProvider>().fetchMembers();
+      context.read<AdminProvider>().fetchApprovedUsers();
       context.read<AdminProvider>().fetchZones();
     });
   }
@@ -41,8 +39,12 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final zonalProvider = context.watch<ZonalProvider>();
     final adminProvider = context.watch<AdminProvider>();
+
+    final zonalMembers = adminProvider.approvedUsers.where((m) {
+      final des = m.designation?.trim().toLowerCase() ?? '';
+      return des == 'zonal committee member';
+    }).toList();
     
     bool isNonZonal(String z) {
       final l = z.trim().toLowerCase();
@@ -67,9 +69,10 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
         uniqueZones.putIfAbsent(z.trim().toLowerCase(), () => formatZoneName(z));
       }
     }
-    for (final m in zonalProvider.members) {
-      if (!isNonZonal(m.zone)) {
-        uniqueZones.putIfAbsent(m.zone.trim().toLowerCase(), () => formatZoneName(m.zone));
+    for (final m in zonalMembers) {
+      final mZone = m.zone ?? '';
+      if (!isNonZonal(mZone)) {
+        uniqueZones.putIfAbsent(mZone.trim().toLowerCase(), () => formatZoneName(mZone));
       }
     }
     final zones = uniqueZones.values.toList()..sort();
@@ -77,13 +80,14 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
     // Automatically select 'All' if not selected yet
     _selectedZone ??= 'All';
 
-    final filteredMembers = zonalProvider.members.where((m) {
-      final isNotExec = !m.zone.toLowerCase().contains('executive');
+    final filteredMembers = zonalMembers.where((m) {
       final matchesZone = _selectedZone == 'All' ||
-          m.zone.trim().toLowerCase() == _selectedZone?.trim().toLowerCase();
+          (m.zone?.trim().toLowerCase() == _selectedZone?.trim().toLowerCase());
       final matchesQuery = m.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          m.designation.toLowerCase().contains(_searchQuery.toLowerCase());
-      return isNotExec && matchesZone && matchesQuery;
+          (m.designation ?? '').toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          m.phoneNumber.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          (m.zone ?? '').toLowerCase().contains(_searchQuery.toLowerCase());
+      return matchesZone && matchesQuery;
     }).toList();
 
     return Scaffold(
@@ -116,7 +120,7 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: ['All', ...zones].any((z) => z.toLowerCase() == _selectedZone?.toLowerCase())
+                      initialValue: ['All', ...zones].any((z) => z.toLowerCase() == _selectedZone?.toLowerCase())
                           ? ['All', ...zones].firstWhere((z) => z.toLowerCase() == _selectedZone?.toLowerCase())
                           : 'All',
                       decoration: const InputDecoration(
@@ -138,7 +142,7 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
                 controller: _searchController,
                 onChanged: (v) => setState(() => _searchQuery = v),
                 decoration: InputDecoration(
-                  hintText: _selectedZone == 'All' ? 'Search all members...' : 'Search members in this zone...',
+                  hintText: _selectedZone == 'All' ? 'Search all zonal members...' : 'Search members in this zone...',
                   prefixIcon: const Icon(Icons.search),
                   filled: true,
                   fillColor: AppColors.brandSecondary.withValues(alpha: 0.03),
@@ -151,10 +155,10 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
             ),
             
             Expanded(
-              child: zonalProvider.isLoading
+              child: adminProvider.isLoading
                   ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
-                  : zonalProvider.error != null
-                      ? Center(child: Text(zonalProvider.error!, style: const TextStyle(color: AppColors.error)))
+                  : adminProvider.error != null
+                      ? Center(child: Text(adminProvider.error!, style: const TextStyle(color: AppColors.error)))
                       : filteredMembers.isEmpty
                           ? Center(
                               child: Column(
@@ -165,7 +169,7 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
                                   Text(
                                     _searchQuery.isNotEmpty 
                                         ? 'No members match search' 
-                                        : (_selectedZone == 'All' ? 'No committee members found' : 'No committee members in this zone'),
+                                        : (_selectedZone == 'All' ? 'No Zonal Committee members found' : 'No Zonal Committee members in this zone'),
                                     style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
                                   ),
                                 ],
@@ -176,6 +180,21 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
                               itemCount: filteredMembers.length,
                               itemBuilder: (context, index) {
                                 final m = filteredMembers[index];
+                                if (m.profileImageId != null &&
+                                    m.profileImageId!.isNotEmpty &&
+                                    !adminProvider.userImages.containsKey(m.uid)) {
+                                  adminProvider.fetchUserImage(m.profileImageId!, m.uid);
+                                }
+                                final imgBase64 = adminProvider.userImages[m.uid];
+                                ImageProvider? imageProvider;
+                                if (m.profileImageId != null && m.profileImageId!.startsWith('http')) {
+                                  imageProvider = NetworkImage(m.profileImageId!);
+                                } else if (imgBase64 != null && imgBase64.isNotEmpty) {
+                                  try {
+                                    imageProvider = MemoryImage(base64Decode(imgBase64));
+                                  } catch (_) {}
+                                }
+
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: AppSpacing.md),
                                   decoration: BoxDecoration(
@@ -197,11 +216,16 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
                                         CircleAvatar(
                                           radius: 30,
                                           backgroundColor: AppColors.brandSecondary.withValues(alpha: 0.06),
-                                          backgroundImage: m.photoBase64 != null
-                                              ? MemoryImage(base64Decode(m.photoBase64!))
-                                              : null,
-                                          child: m.photoBase64 == null
-                                              ? const Icon(Icons.person, color: AppColors.brandPrimary, size: 30)
+                                          backgroundImage: imageProvider,
+                                          child: imageProvider == null
+                                              ? Text(
+                                                  m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
+                                                  style: const TextStyle(
+                                                    color: AppColors.brandPrimary,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 20,
+                                                  ),
+                                                )
                                               : null,
                                         ),
                                         const SizedBox(width: AppSpacing.md),
@@ -218,7 +242,7 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
                                               ),
                                               const SizedBox(height: 2),
                                               Text(
-                                                m.designation,
+                                                '${m.designation ?? "Zonal Committee Member"} | Zone: ${m.zone ?? "N/A"}',
                                                 style: const TextStyle(
                                                   color: AppColors.brandPrimary,
                                                   fontWeight: FontWeight.bold,
@@ -226,23 +250,27 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
                                                 ),
                                               ),
                                               const SizedBox(height: 8),
-                                              Row(
+                                              Wrap(
+                                                spacing: 12,
+                                                runSpacing: 4,
                                                 children: [
-                                                  const Icon(Icons.phone, size: 14, color: AppColors.onSurfaceVariant),
-                                                  const SizedBox(width: 4),
-                                                  Text(m.phoneNumber, style: const TextStyle(fontSize: 12, color: AppColors.brandSecondary)),
-                                                  if (m.email.isNotEmpty) ...[
-                                                    const SizedBox(width: AppSpacing.lg),
-                                                    const Icon(Icons.email, size: 14, color: AppColors.onSurfaceVariant),
-                                                    const SizedBox(width: 4),
-                                                    Expanded(
-                                                      child: Text(
-                                                        m.email,
-                                                        overflow: TextOverflow.ellipsis,
-                                                        style: const TextStyle(fontSize: 12, color: AppColors.brandSecondary),
-                                                      ),
+                                                  Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      const Icon(Icons.phone, size: 14, color: AppColors.onSurfaceVariant),
+                                                      const SizedBox(width: 4),
+                                                      Text(m.phoneNumber, style: const TextStyle(fontSize: 12, color: AppColors.brandSecondary)),
+                                                    ],
+                                                  ),
+                                                  if (m.zone != null && m.zone!.isNotEmpty)
+                                                    Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        const Icon(Icons.map_outlined, size: 14, color: AppColors.onSurfaceVariant),
+                                                        const SizedBox(width: 4),
+                                                        Text(m.zone!, style: const TextStyle(fontSize: 12, color: AppColors.brandSecondary)),
+                                                      ],
                                                     ),
-                                                  ],
                                                 ],
                                               ),
                                             ],

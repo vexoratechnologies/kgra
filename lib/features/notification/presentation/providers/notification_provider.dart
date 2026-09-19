@@ -29,8 +29,54 @@ class NotificationProvider extends ChangeNotifier {
 
   String? _lastReadTime;
   Set<String> _readIds = {};
+  String? _activeUserId;
 
-  List<NotificationModel> get notificationsList => _notifications;
+  void setActiveUserId(String? uid) {
+    if (_activeUserId != uid) {
+      _activeUserId = uid;
+      _calculateUnreadCount();
+      notifyListeners();
+    }
+  }
+
+  /// Returns notifications filtered specifically for the current user:
+  /// - General announcements (targetUserId is null or 'all')
+  /// - Targeted notifications where targetUserId == currentUserId
+  /// - Deduplicates legacy approval notifications so users don't see 5 duplicate "Registration Approved" alerts
+  List<NotificationModel> get notificationsList => getNotificationsForUser(_activeUserId);
+
+  List<NotificationModel> getNotificationsForUser(String? currentUserId) {
+    if (_notifications.isEmpty) return [];
+
+    final list = <NotificationModel>[];
+    bool hasSeenLegacyApproval = false;
+
+    for (final n in _notifications) {
+      final isApproval = n.title.toLowerCase().contains('registration approved') ||
+          n.title.toLowerCase().contains('account approved') ||
+          n.body.toLowerCase().contains('account registration has been approved');
+
+      if (n.targetUserId != null && n.targetUserId!.isNotEmpty && n.targetUserId != 'all') {
+        // Targeted notification: only show if matching current user
+        if (currentUserId != null && n.targetUserId == currentUserId) {
+          list.add(n);
+        }
+      } else {
+        // Broadcast notification (or legacy without targetUserId)
+        if (isApproval) {
+          // If legacy approval notification without targetUserId, only show once to avoid repeating 5 times
+          if (!hasSeenLegacyApproval) {
+            hasSeenLegacyApproval = true;
+            list.add(n);
+          }
+        } else {
+          list.add(n);
+        }
+      }
+    }
+    return list;
+  }
+
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get hasMore => _hasMore;
@@ -63,12 +109,13 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   void _calculateUnreadCount() {
-    if (_notifications.isEmpty) {
+    final list = notificationsList;
+    if (list.isEmpty) {
       _unreadCount = 0;
       return;
     }
     int count = 0;
-    for (final n in _notifications) {
+    for (final n in list) {
       if (_isUnread(n)) {
         count++;
       }
@@ -201,28 +248,34 @@ class NotificationProvider extends ChangeNotifier {
     }
   }
 
-  /// Automatically generates and saves a notification to Firestore and broadcasts FCM push alert.
+  /// Automatically generates and saves a notification to Firestore.
+  /// If targetUserId is null or 'all', also broadcasts FCM push alert to all members.
   Future<bool> sendSystemNotification({
     required String title,
     required String body,
     required String routingPath,
+    String? targetUserId,
   }) async {
-    print('🔔 [NotificationProvider] sendSystemNotification: "$title"');
+    print('🔔 [NotificationProvider] sendSystemNotification: "$title" (target: $targetUserId)');
     final notification = NotificationModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: title,
       body: body,
       routingPath: routingPath,
       createdAt: DateTime.now().toIso8601String(),
+      targetUserId: targetUserId,
     );
-    try {
-      await PushNotificationService.instance.sendBroadcastNotification(
-        title: title,
-        body: body,
-        routingPath: routingPath,
-      );
-    } catch (e) {
-      print('❌ Error triggering FCM broadcast push notification: $e');
+    // Only broadcast push notification if this is a general announcement for all members
+    if (targetUserId == null || targetUserId.isEmpty || targetUserId == 'all') {
+      try {
+        await PushNotificationService.instance.sendBroadcastNotification(
+          title: title,
+          body: body,
+          routingPath: routingPath,
+        );
+      } catch (e) {
+        print('❌ Error triggering FCM broadcast push notification: $e');
+      }
     }
     return await addNotification(notification);
   }

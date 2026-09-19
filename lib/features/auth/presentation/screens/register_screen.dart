@@ -40,15 +40,51 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AdminProvider>().fetchZones();
-      context.read<AdminProvider>().fetchDesignations();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final adminProv = context.read<AdminProvider>();
+      await Future.wait([
+        adminProv.fetchZones(),
+        adminProv.fetchDesignations(),
+      ]);
+      if (!mounted) return;
+
+      final validZones = adminProv.zones.where((z) {
+        final clean = z.trim().toLowerCase();
+        return clean.isNotEmpty &&
+            !clean.contains('exec') &&
+            !clean.contains('state') &&
+            clean != 'all';
+      }).toSet().toList();
+
+      if (_selectedZone == null && validZones.isNotEmpty) {
+        setState(() {
+          _selectedZone = validZones.first;
+        });
+      }
+
+      if (_selectedZone != null && _selectedZone!.isNotEmpty) {
+        await _updateMembershipIdPreview(_selectedZone!);
+      }
     });
+
     final authProvider = context.read<AuthProvider>();
     if (authProvider.verificationPhone != null && authProvider.verificationPhone!.length >= 10) {
       final rawPhone = authProvider.verificationPhone!;
       final numberOnly = rawPhone.startsWith('+91') ? rawPhone.substring(3) : rawPhone;
       _phoneController.text = numberOnly;
+    }
+  }
+
+  Future<void> _updateMembershipIdPreview(String zone) async {
+    try {
+      final nextId = await context.read<AuthProvider>().peekNextMembershipId(zone);
+      if (mounted) {
+        setState(() {
+          _membershipIdController.text = nextId;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error updating membership ID preview: $e');
     }
   }
 
@@ -389,15 +425,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 value: z,
                                 child: Text(z),
                               )).toList(),
-                              onChanged: (val) async {
+                              onChanged: (val) {
                                 setState(() {
                                   _selectedZone = val;
                                 });
                                 if (val != null && val.isNotEmpty) {
-                                  final nextId = await context.read<AuthProvider>().peekNextMembershipId(val);
-                                  if (mounted) {
-                                    _membershipIdController.text = nextId;
-                                  }
+                                  _updateMembershipIdPreview(val);
                                 }
                               },
                               validator: (value) => value == null ? 'Zone is required' : null,

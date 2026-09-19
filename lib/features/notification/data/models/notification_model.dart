@@ -4,6 +4,7 @@ class NotificationModel {
   final String body;
   final String routingPath;
   final String createdAt;
+  final String? targetUserId;
 
   const NotificationModel({
     required this.id,
@@ -11,6 +12,7 @@ class NotificationModel {
     required this.body,
     required this.routingPath,
     required this.createdAt,
+    this.targetUserId,
   });
 
   NotificationModel copyWith({
@@ -19,6 +21,7 @@ class NotificationModel {
     String? body,
     String? routingPath,
     String? createdAt,
+    String? targetUserId,
   }) {
     return NotificationModel(
       id: id ?? this.id,
@@ -26,6 +29,7 @@ class NotificationModel {
       body: body ?? this.body,
       routingPath: routingPath ?? this.routingPath,
       createdAt: createdAt ?? this.createdAt,
+      targetUserId: targetUserId ?? this.targetUserId,
     );
   }
 
@@ -36,6 +40,7 @@ class NotificationModel {
       'body': body,
       'routingPath': routingPath,
       'createdAt': createdAt,
+      if (targetUserId != null) 'targetUserId': targetUserId,
     };
   }
 
@@ -46,12 +51,13 @@ class NotificationModel {
       body: json['body'] as String? ?? '',
       routingPath: json['routingPath'] as String? ?? '',
       createdAt: json['createdAt'] as String? ?? '',
+      targetUserId: json['targetUserId'] as String?,
     );
   }
 
   @override
   String toString() {
-    return 'NotificationModel(id: $id, title: $title, body: $body, routingPath: $routingPath, createdAt: $createdAt)';
+    return 'NotificationModel(id: $id, title: $title, body: $body, routingPath: $routingPath, createdAt: $createdAt, targetUserId: $targetUserId)';
   }
 
   @override
@@ -62,11 +68,12 @@ class NotificationModel {
         other.title == title &&
         other.body == body &&
         other.routingPath == routingPath &&
-        other.createdAt == createdAt;
+        other.createdAt == createdAt &&
+        other.targetUserId == targetUserId;
   }
 
   @override
   int get hashCode {
-    return Object.hash(id, title, body, routingPath, createdAt);
+    return Object.hash(id, title, body, routingPath, createdAt, targetUserId);
   }
 }

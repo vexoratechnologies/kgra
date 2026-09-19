@@ -25,11 +25,14 @@ void main() async {
     // Initialize Push Notifications
     await PushNotificationService.instance.initialize();
 
-    // Automatically establish an anonymous session to prevent permission issues
+    // Establish an anonymous session in background without blocking initial frame
     final auth = FirebaseAuth.instance;
     if (auth.currentUser == null) {
-      await auth.signInAnonymously();
-      debugPrint('Established anonymous session on startup.');
+      auth.signInAnonymously().then((_) {
+        debugPrint('Established anonymous session on startup.');
+      }).catchError((e) {
+        debugPrint('Startup anonymous auth error: $e');
+      });
     }
 
     // Initialize Remote App Lock & Version Checker

@@ -39,7 +39,10 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
       const _MenuScreen(),
     ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<NotificationProvider>().fetchNotifications();
+      final auth = context.read<AuthProvider>();
+      final notif = context.read<NotificationProvider>();
+      notif.setActiveUserId(auth.currentUser?.uid);
+      notif.fetchNotifications();
     });
   }
 
@@ -49,7 +52,9 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
     });
     if (index == 1) {
       // Trigger a fresh fetch of notifications when the Alerts tab is selected and mark as read
+      final auth = context.read<AuthProvider>();
       final notif = context.read<NotificationProvider>();
+      notif.setActiveUserId(auth.currentUser?.uid);
       notif.markAllAsRead();
       notif.fetchNotifications().then((_) {
         notif.markAllAsRead();

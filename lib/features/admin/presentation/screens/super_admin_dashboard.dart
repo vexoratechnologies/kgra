@@ -150,11 +150,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     } else if (label == 'Designations') {
       adminProv.fetchDesignations();
     } else if (label == 'State Committee' || label == 'State Committee Members') {
-      context.read<StateCommitteeProvider>().fetchMembers();
+      adminProv.fetchApprovedUsers();
     } else if (label == 'Executive Committee' || label == 'Executive Committee Members' || label == 'Zonal Committee' || label == 'Zonal Committee Members') {
-      context.read<ZonalProvider>().fetchMembers();
+      adminProv.fetchApprovedUsers();
       adminProv.fetchZones();
-      adminProv.fetchDesignations();
     } else if (label == 'Meeting Minutes' || label == 'Minutes Approvals') {
       context.read<MeetingMinutesProvider>().fetchAllMinutes();
     } else if (label == 'Government Orders') {
@@ -1138,6 +1137,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                                                     title: 'Registration Approved',
                                                     body: 'Your account registration has been approved.',
                                                     routingPath: AppRoutes.home,
+                                                    targetUserId: user.uid,
                                                   );
                                                   if (context.mounted) {
                                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -1617,8 +1617,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   // ==========================================
 
   Widget _buildStateCommitteeView(BuildContext context) {
-    final provider = context.watch<StateCommitteeProvider>();
-    final members = provider.members;
+    final adminProvider = context.watch<AdminProvider>();
+    final stateMembers = adminProvider.approvedUsers.where((m) {
+      final des = m.designation?.trim().toLowerCase() ?? '';
+      return des == 'state committee member';
+    }).toList();
 
     return Column(
       children: [
@@ -1631,26 +1634,33 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('State Committee Members (${members.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.brandPrimary, foregroundColor: Colors.white),
-                onPressed: () => _showStateMemberDialog(context),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add Member'),
-              ),
+              Text('State Committee Members (${stateMembers.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ],
           ),
         ),
         Expanded(
-          child: provider.isLoading
+          child: adminProvider.isLoading
               ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
-              : members.isEmpty
+              : stateMembers.isEmpty
                   ? const Center(child: Text('No State Committee members found.'))
                   : ListView.builder(
                       padding: const EdgeInsets.all(AppSpacing.lg),
-                      itemCount: members.length,
+                      itemCount: stateMembers.length,
                       itemBuilder: (context, index) {
-                        final m = members[index];
+                        final m = stateMembers[index];
+                        if (m.profileImageId != null && m.profileImageId!.isNotEmpty && !adminProvider.userImages.containsKey(m.uid)) {
+                          adminProvider.fetchUserImage(m.profileImageId!, m.uid);
+                        }
+                        final imgBase64 = adminProvider.userImages[m.uid];
+                        ImageProvider? imageProvider;
+                        if (m.profileImageId != null && m.profileImageId!.startsWith('http')) {
+                          imageProvider = NetworkImage(m.profileImageId!);
+                        } else if (imgBase64 != null && imgBase64.isNotEmpty) {
+                          try {
+                            imageProvider = MemoryImage(base64Decode(imgBase64));
+                          } catch (_) {}
+                        }
+
                         return Container(
                           margin: const EdgeInsets.only(bottom: AppSpacing.md),
                           decoration: BoxDecoration(
@@ -1662,29 +1672,16 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                             leading: CircleAvatar(
                               radius: 24,
                               backgroundColor: AppColors.brandPrimary.withValues(alpha: 0.1),
-                              backgroundImage: m.photoBase64 != null ? MemoryImage(base64Decode(m.photoBase64!)) : null,
-                              child: m.photoBase64 == null ? const Icon(Icons.person, color: AppColors.brandPrimary) : null,
+                              backgroundImage: imageProvider,
+                              child: imageProvider == null
+                                  ? Text(
+                                      m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
+                                      style: const TextStyle(color: AppColors.brandPrimary, fontWeight: FontWeight.bold),
+                                    )
+                                  : null,
                             ),
                             title: Text(m.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text('${m.designation} | Phone: ${m.phoneNumber} | Email: ${m.email}'),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit, color: Colors.blue),
-                                  onPressed: () => _showStateMemberDialog(context, member: m),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: AppColors.error),
-                                  onPressed: () => _confirmDelete(
-                                    context,
-                                    title: 'Delete Member',
-                                    content: 'Are you sure you want to delete ${m.name}?',
-                                    onConfirm: () => provider.deleteMember(m.id),
-                                  ),
-                                ),
-                              ],
-                            ),
+                            subtitle: Text('${m.designation ?? "State Committee Member"} | Phone: ${m.phoneNumber} | Zone: ${m.zone ?? "N/A"} | ID: ${m.membershipId ?? "N/A"}'),
                           ),
                         );
                       },
@@ -1813,18 +1810,25 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   }
 
   Widget _buildZonalOrExecutiveCommitteeView(BuildContext context, {required bool isExecutive}) {
-    final zonalProv = context.watch<ZonalProvider>();
     final adminProv = context.watch<AdminProvider>();
     final allMembers = isExecutive
-        ? zonalProv.members.where((m) => m.zone.toLowerCase().contains('executive')).toList()
-        : zonalProv.members.where((m) => !m.zone.toLowerCase().contains('executive')).toList();
+        ? adminProv.approvedUsers.where((m) {
+            final des = m.designation?.trim().toLowerCase() ?? '';
+            return des == 'executive committee member' || des == 'executive commitee member';
+          }).toList()
+        : adminProv.approvedUsers.where((m) {
+            final des = m.designation?.trim().toLowerCase() ?? '';
+            return des == 'zonal committee member';
+          }).toList();
     final zones = adminProv.zones;
 
     final filtered = allMembers.where((m) {
-      final matchesZone = _committeeZoneFilter == 'All' || m.zone == _committeeZoneFilter;
+      final matchesZone = _committeeZoneFilter == 'All' ||
+          (m.zone?.trim().toLowerCase() == _committeeZoneFilter.trim().toLowerCase());
       final matchesQuery = _committeeSearchQuery.isEmpty ||
           m.name.toLowerCase().contains(_committeeSearchQuery.toLowerCase()) ||
-          m.designation.toLowerCase().contains(_committeeSearchQuery.toLowerCase());
+          (m.designation ?? '').toLowerCase().contains(_committeeSearchQuery.toLowerCase()) ||
+          (m.zone ?? '').toLowerCase().contains(_committeeSearchQuery.toLowerCase());
       return (isExecutive || matchesZone) && matchesQuery;
     }).toList();
 
@@ -1864,12 +1868,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 ),
                 const SizedBox(width: 12),
               ],
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.brandPrimary, foregroundColor: Colors.white),
-                onPressed: () => _showZonalMemberDialog(context, isExecutive: isExecutive),
-                icon: const Icon(Icons.add, size: 18),
-                label: Text(isExecutive ? 'Add Executive Member' : 'Add Zonal Member'),
-              ),
             ],
           ),
         ),
@@ -1881,6 +1879,19 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   itemCount: filtered.length,
                   itemBuilder: (context, index) {
                     final m = filtered[index];
+                    if (m.profileImageId != null && m.profileImageId!.isNotEmpty && !adminProv.userImages.containsKey(m.uid)) {
+                      adminProv.fetchUserImage(m.profileImageId!, m.uid);
+                    }
+                    final imgBase64 = adminProv.userImages[m.uid];
+                    ImageProvider? imageProvider;
+                    if (m.profileImageId != null && m.profileImageId!.startsWith('http')) {
+                      imageProvider = NetworkImage(m.profileImageId!);
+                    } else if (imgBase64 != null && imgBase64.isNotEmpty) {
+                      try {
+                        imageProvider = MemoryImage(base64Decode(imgBase64));
+                      } catch (_) {}
+                    }
+
                     return Container(
                       margin: const EdgeInsets.only(bottom: AppSpacing.md),
                       decoration: BoxDecoration(
@@ -1892,29 +1903,16 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                         leading: CircleAvatar(
                           radius: 24,
                           backgroundColor: AppColors.brandPrimary.withValues(alpha: 0.1),
-                          backgroundImage: m.photoBase64 != null ? MemoryImage(base64Decode(m.photoBase64!)) : null,
-                          child: m.photoBase64 == null ? const Icon(Icons.person, color: AppColors.brandPrimary) : null,
+                          backgroundImage: imageProvider,
+                          child: imageProvider == null
+                              ? Text(
+                                  m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
+                                  style: const TextStyle(color: AppColors.brandPrimary, fontWeight: FontWeight.bold),
+                                )
+                              : null,
                         ),
                         title: Text(m.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('${isExecutive ? "Executive Committee" : "Zone: ${m.zone}"} | Designation: ${m.designation} | Phone: ${m.phoneNumber}'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit, color: Colors.blue),
-                              onPressed: () => _showZonalMemberDialog(context, member: m, isExecutive: isExecutive),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: AppColors.error),
-                              onPressed: () => _confirmDelete(
-                                context,
-                                title: 'Delete Member',
-                                content: 'Are you sure you want to delete ${m.name}?',
-                                onConfirm: () => zonalProv.deleteMember(m.id),
-                              ),
-                            ),
-                          ],
-                        ),
+                        subtitle: Text('${isExecutive ? "Executive Committee" : "Zone: ${m.zone ?? 'N/A'}"} | Designation: ${m.designation ?? "Member"} | Phone: ${m.phoneNumber} | ID: ${m.membershipId ?? "N/A"}'),
                       ),
                     );
                   },

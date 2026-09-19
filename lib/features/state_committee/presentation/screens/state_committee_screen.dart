@@ -8,7 +8,7 @@ import '../../../../core/theme/app_text_style.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/widgets/compact_app_bar.dart';
-import '../providers/state_committee_provider.dart';
+import '../../../admin/presentation/providers/admin_provider.dart';
 
 class StateCommitteeScreen extends StatefulWidget {
   const StateCommitteeScreen({super.key});
@@ -25,7 +25,7 @@ class _StateCommitteeScreenState extends State<StateCommitteeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<StateCommitteeProvider>().fetchMembers();
+      context.read<AdminProvider>().fetchApprovedUsers();
     });
   }
 
@@ -37,19 +37,25 @@ class _StateCommitteeScreenState extends State<StateCommitteeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<StateCommitteeProvider>();
-    final members = provider.members;
-    final filteredMembers = members.where((m) {
+    final adminProvider = context.watch<AdminProvider>();
+    final stateMembers = adminProvider.approvedUsers.where((m) {
+      final des = m.designation?.trim().toLowerCase() ?? '';
+      return des == 'state committee member';
+    }).toList();
+
+    final filteredMembers = stateMembers.where((m) {
       final query = _searchQuery.toLowerCase();
       return m.name.toLowerCase().contains(query) ||
-          m.designation.toLowerCase().contains(query);
+          (m.designation ?? '').toLowerCase().contains(query) ||
+          m.phoneNumber.toLowerCase().contains(query) ||
+          (m.zone ?? '').toLowerCase().contains(query);
     }).toList();
 
     return Scaffold(
       backgroundColor: AppColors.brandBackground,
       appBar: CompactAppBar(
         title: 'State Committee Members',
-        subtitle: 'Office bearers',
+        subtitle: 'Office bearers & committee leaders',
         rightIcon: Icons.people_outline,
         onBackTap: () {
           if (context.canPop()) {
@@ -70,7 +76,7 @@ class _StateCommitteeScreenState extends State<StateCommitteeScreen> {
                 controller: _searchController,
                 onChanged: (v) => setState(() => _searchQuery = v),
                 decoration: InputDecoration(
-                  hintText: 'Search members by name or designation...',
+                  hintText: 'Search members by name, designation, zone...',
                   prefixIcon: const Icon(Icons.search),
                   filled: true,
                   fillColor: AppColors.brandSecondary.withValues(alpha: 0.03),
@@ -82,13 +88,13 @@ class _StateCommitteeScreenState extends State<StateCommitteeScreen> {
               ),
             ),
             Expanded(
-              child: provider.isLoading
+              child: adminProvider.isLoading
                   ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
-                  : provider.error != null
+                  : adminProvider.error != null
                       ? Center(
                           child: Padding(
                             padding: const EdgeInsets.all(24.0),
-                            child: Text(provider.error!, style: const TextStyle(color: AppColors.error)),
+                            child: Text(adminProvider.error!, style: const TextStyle(color: AppColors.error)),
                           ),
                         )
                       : filteredMembers.isEmpty
@@ -99,7 +105,7 @@ class _StateCommitteeScreenState extends State<StateCommitteeScreen> {
                                   Icon(Icons.people_outline, size: 64, color: Colors.grey.shade400),
                                   const SizedBox(height: 16),
                                   Text(
-                                    _searchQuery.isNotEmpty ? 'No members match your search' : 'No committee members found',
+                                    _searchQuery.isNotEmpty ? 'No members match your search' : 'No State Committee members found',
                                     style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
                                   ),
                                 ],
@@ -110,6 +116,21 @@ class _StateCommitteeScreenState extends State<StateCommitteeScreen> {
                               itemCount: filteredMembers.length,
                               itemBuilder: (context, index) {
                                 final m = filteredMembers[index];
+                                if (m.profileImageId != null &&
+                                    m.profileImageId!.isNotEmpty &&
+                                    !adminProvider.userImages.containsKey(m.uid)) {
+                                  adminProvider.fetchUserImage(m.profileImageId!, m.uid);
+                                }
+                                final imgBase64 = adminProvider.userImages[m.uid];
+                                ImageProvider? imageProvider;
+                                if (m.profileImageId != null && m.profileImageId!.startsWith('http')) {
+                                  imageProvider = NetworkImage(m.profileImageId!);
+                                } else if (imgBase64 != null && imgBase64.isNotEmpty) {
+                                  try {
+                                    imageProvider = MemoryImage(base64Decode(imgBase64));
+                                  } catch (_) {}
+                                }
+
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: AppSpacing.md),
                                   decoration: BoxDecoration(
@@ -131,11 +152,16 @@ class _StateCommitteeScreenState extends State<StateCommitteeScreen> {
                                         CircleAvatar(
                                           radius: 30,
                                           backgroundColor: AppColors.brandSecondary.withValues(alpha: 0.06),
-                                          backgroundImage: m.photoBase64 != null
-                                              ? MemoryImage(base64Decode(m.photoBase64!))
-                                              : null,
-                                          child: m.photoBase64 == null
-                                              ? const Icon(Icons.person, color: AppColors.brandPrimary, size: 30)
+                                          backgroundImage: imageProvider,
+                                          child: imageProvider == null
+                                              ? Text(
+                                                  m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
+                                                  style: const TextStyle(
+                                                    color: AppColors.brandPrimary,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 20,
+                                                  ),
+                                                )
                                               : null,
                                         ),
                                         const SizedBox(width: AppSpacing.md),
@@ -152,7 +178,7 @@ class _StateCommitteeScreenState extends State<StateCommitteeScreen> {
                                               ),
                                               const SizedBox(height: 2),
                                               Text(
-                                                m.designation,
+                                                m.designation ?? 'State Committee Member',
                                                 style: const TextStyle(
                                                   color: AppColors.brandPrimary,
                                                   fontWeight: FontWeight.bold,
@@ -160,23 +186,27 @@ class _StateCommitteeScreenState extends State<StateCommitteeScreen> {
                                                 ),
                                               ),
                                               const SizedBox(height: 8),
-                                              Row(
+                                              Wrap(
+                                                spacing: 12,
+                                                runSpacing: 4,
                                                 children: [
-                                                  const Icon(Icons.phone, size: 14, color: AppColors.onSurfaceVariant),
-                                                  const SizedBox(width: 4),
-                                                  Text(m.phoneNumber, style: const TextStyle(fontSize: 12, color: AppColors.brandSecondary)),
-                                                  if (m.email.isNotEmpty) ...[
-                                                    const SizedBox(width: AppSpacing.lg),
-                                                    const Icon(Icons.email, size: 14, color: AppColors.onSurfaceVariant),
-                                                    const SizedBox(width: 4),
-                                                    Expanded(
-                                                      child: Text(
-                                                        m.email,
-                                                        overflow: TextOverflow.ellipsis,
-                                                        style: const TextStyle(fontSize: 12, color: AppColors.brandSecondary),
-                                                      ),
+                                                  Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      const Icon(Icons.phone, size: 14, color: AppColors.onSurfaceVariant),
+                                                      const SizedBox(width: 4),
+                                                      Text(m.phoneNumber, style: const TextStyle(fontSize: 12, color: AppColors.brandSecondary)),
+                                                    ],
+                                                  ),
+                                                  if (m.zone != null && m.zone!.isNotEmpty)
+                                                    Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        const Icon(Icons.map_outlined, size: 14, color: AppColors.onSurfaceVariant),
+                                                        const SizedBox(width: 4),
+                                                        Text(m.zone!, style: const TextStyle(fontSize: 12, color: AppColors.brandSecondary)),
+                                                      ],
                                                     ),
-                                                  ],
                                                 ],
                                               ),
                                             ],

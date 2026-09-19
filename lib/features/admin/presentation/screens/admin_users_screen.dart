@@ -115,9 +115,10 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     } else if (label == 'Rejected Requests') {
       context.read<AdminProvider>().fetchRejectedUsers();
     } else if (label == 'Committee Members' || label == 'State Committee' || label == 'State Committee Members') {
-      context.read<StateCommitteeProvider>().fetchMembers();
+      context.read<AdminProvider>().fetchApprovedUsers();
     } else if (label == 'Zonal Committee' || label == 'Zonal Committee Members' || label == 'Executive Committee' || label == 'Executive Committee Members') {
-      context.read<ZonalProvider>().fetchMembers();
+      context.read<AdminProvider>().fetchApprovedUsers();
+      context.read<AdminProvider>().fetchZones();
     } else if (label == 'Meeting Minutes') {
       context.read<MeetingMinutesProvider>().fetchAllMinutes();
     } else if (label == 'Govt Orders') {
@@ -1749,8 +1750,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   // ==========================================
 
   Widget _buildCommitteeMembersView(BuildContext context) {
-    final provider = context.watch<StateCommitteeProvider>();
-    final members = provider.members;
+    final adminProvider = context.watch<AdminProvider>();
+    final members = adminProvider.approvedUsers.where((m) {
+      final des = m.designation?.trim().toLowerCase() ?? '';
+      return des == 'state committee member';
+    }).toList();
 
     return Column(
       children: [
@@ -1764,27 +1768,17 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'State Committee Members Management',
+                'State Committee Members Management (${members.length})',
                 style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold),
-              ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.brandPrimary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: AppRadius.borderMd),
-                ),
-                onPressed: () => _showCommitteeMemberDialog(context),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add Member'),
               ),
             ],
           ),
         ),
         Expanded(
-          child: provider.isLoading
+          child: adminProvider.isLoading
               ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
-              : provider.error != null
-                  ? Center(child: Text(provider.error!, style: const TextStyle(color: AppColors.error)))
+              : adminProvider.error != null
+                  ? Center(child: Text(adminProvider.error!, style: const TextStyle(color: AppColors.error)))
                   : members.isEmpty
                       ? const Center(child: Text('No committee members found.'))
                       : ListView.builder(
@@ -1792,6 +1786,19 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                           itemCount: members.length,
                           itemBuilder: (context, index) {
                             final m = members[index];
+                            if (m.profileImageId != null && m.profileImageId!.isNotEmpty && !adminProvider.userImages.containsKey(m.uid)) {
+                              adminProvider.fetchUserImage(m.profileImageId!, m.uid);
+                            }
+                            final imgBase64 = adminProvider.userImages[m.uid];
+                            ImageProvider? imageProvider;
+                            if (m.profileImageId != null && m.profileImageId!.startsWith('http')) {
+                              imageProvider = NetworkImage(m.profileImageId!);
+                            } else if (imgBase64 != null && imgBase64.isNotEmpty) {
+                              try {
+                                imageProvider = MemoryImage(base64Decode(imgBase64));
+                              } catch (_) {}
+                            }
+
                             return Container(
                               margin: const EdgeInsets.only(bottom: AppSpacing.md),
                               child: _buildCardWrapper(
@@ -1802,11 +1809,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                       CircleAvatar(
                                         radius: 28,
                                         backgroundColor: AppColors.brandSecondary.withValues(alpha: 0.06),
-                                        backgroundImage: m.photoBase64 != null
-                                            ? MemoryImage(base64Decode(m.photoBase64!))
-                                            : null,
-                                        child: m.photoBase64 == null
-                                            ? const Icon(Icons.person, color: AppColors.brandPrimary, size: 28)
+                                        backgroundImage: imageProvider,
+                                        child: imageProvider == null
+                                            ? Text(
+                                                m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
+                                                style: const TextStyle(color: AppColors.brandPrimary, fontWeight: FontWeight.bold, fontSize: 18),
+                                              )
                                             : null,
                                       ),
                                       const SizedBox(width: AppSpacing.md),
@@ -1820,7 +1828,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
-                                              m.designation,
+                                              m.designation ?? 'State Committee Member',
                                               style: const TextStyle(color: AppColors.brandPrimary, fontWeight: FontWeight.w600, fontSize: 12),
                                             ),
                                             const SizedBox(height: 4),
@@ -1830,25 +1838,18 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                                 const SizedBox(width: 4),
                                                 Text(m.phoneNumber, style: const TextStyle(fontSize: 11, color: Colors.grey)),
                                                 const SizedBox(width: AppSpacing.md),
-                                                const Icon(Icons.email, size: 12, color: Colors.grey),
+                                                const Icon(Icons.badge_outlined, size: 12, color: Colors.grey),
                                                 const SizedBox(width: 4),
-                                                Text(m.email, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                                Text(m.membershipId ?? 'N/A', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                                if (m.zone != null && m.zone!.isNotEmpty) ...[
+                                                  const SizedBox(width: AppSpacing.md),
+                                                  const Icon(Icons.map_outlined, size: 12, color: Colors.grey),
+                                                  const SizedBox(width: 4),
+                                                  Text(m.zone!, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                                ],
                                               ],
                                             ),
                                           ],
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.edit, color: Colors.blue),
-                                        onPressed: () => _showCommitteeMemberDialog(context, member: m),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.delete, color: AppColors.error),
-                                        onPressed: () => _confirmDelete(
-                                          context,
-                                          title: 'Delete Member',
-                                          content: 'Are you sure you want to delete ${m.name}?',
-                                          onConfirm: () => provider.deleteMember(m.id),
                                         ),
                                       ),
                                     ],
@@ -3076,8 +3077,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   }
 
   Widget _buildExecutiveCommitteeView(BuildContext context) {
-    final provider = context.watch<ZonalProvider>();
-    final members = provider.members.where((m) => m.zone.toLowerCase().contains('executive')).toList();
+    final adminProvider = context.watch<AdminProvider>();
+    final members = adminProvider.approvedUsers.where((m) {
+      final des = m.designation?.trim().toLowerCase() ?? '';
+      return des == 'executive committee member' || des == 'executive commitee member';
+    }).toList();
 
     return Column(
       children: [
@@ -3091,27 +3095,17 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Executive Committee Members Management',
+                'Executive Committee Members Management (${members.length})',
                 style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold),
-              ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.brandPrimary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: AppRadius.borderMd),
-                ),
-                onPressed: () => _showZonalMemberDialog(context, defaultZone: 'Executive Committee'),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add Executive Member'),
               ),
             ],
           ),
         ),
         Expanded(
-          child: provider.isLoading
+          child: adminProvider.isLoading
               ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
-              : provider.error != null
-                  ? Center(child: Text(provider.error!, style: const TextStyle(color: AppColors.error)))
+              : adminProvider.error != null
+                  ? Center(child: Text(adminProvider.error!, style: const TextStyle(color: AppColors.error)))
                   : members.isEmpty
                       ? const Center(child: Text('No executive committee members found.'))
                       : ListView.builder(
@@ -3119,6 +3113,19 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                           itemCount: members.length,
                           itemBuilder: (context, index) {
                             final m = members[index];
+                            if (m.profileImageId != null && m.profileImageId!.isNotEmpty && !adminProvider.userImages.containsKey(m.uid)) {
+                              adminProvider.fetchUserImage(m.profileImageId!, m.uid);
+                            }
+                            final imgBase64 = adminProvider.userImages[m.uid];
+                            ImageProvider? imageProvider;
+                            if (m.profileImageId != null && m.profileImageId!.startsWith('http')) {
+                              imageProvider = NetworkImage(m.profileImageId!);
+                            } else if (imgBase64 != null && imgBase64.isNotEmpty) {
+                              try {
+                                imageProvider = MemoryImage(base64Decode(imgBase64));
+                              } catch (_) {}
+                            }
+
                             return Container(
                               margin: const EdgeInsets.only(bottom: AppSpacing.md),
                               child: _buildCardWrapper(
@@ -3129,11 +3136,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                       CircleAvatar(
                                         radius: 28,
                                         backgroundColor: AppColors.brandSecondary.withValues(alpha: 0.06),
-                                        backgroundImage: m.photoBase64 != null
-                                            ? MemoryImage(base64Decode(m.photoBase64!))
-                                            : null,
-                                        child: m.photoBase64 == null
-                                            ? const Icon(Icons.person, color: AppColors.brandPrimary, size: 28)
+                                        backgroundImage: imageProvider,
+                                        child: imageProvider == null
+                                            ? Text(
+                                                m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
+                                                style: const TextStyle(color: AppColors.brandPrimary, fontWeight: FontWeight.bold, fontSize: 18),
+                                              )
                                             : null,
                                       ),
                                       const SizedBox(width: AppSpacing.md),
@@ -3147,7 +3155,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
-                                              '${m.designation} | Executive Committee',
+                                              m.designation ?? 'Executive Committee Member',
                                               style: const TextStyle(
                                                 color: AppColors.brandPrimary,
                                                 fontWeight: FontWeight.bold,
@@ -3161,25 +3169,18 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                                 const SizedBox(width: 4),
                                                 Text(m.phoneNumber, style: const TextStyle(fontSize: 11, color: Colors.grey)),
                                                 const SizedBox(width: AppSpacing.md),
-                                                const Icon(Icons.email, size: 12, color: Colors.grey),
+                                                const Icon(Icons.badge_outlined, size: 12, color: Colors.grey),
                                                 const SizedBox(width: 4),
-                                                Text(m.email, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                                Text(m.membershipId ?? 'N/A', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                                if (m.zone != null && m.zone!.isNotEmpty) ...[
+                                                  const SizedBox(width: AppSpacing.md),
+                                                  const Icon(Icons.map_outlined, size: 12, color: Colors.grey),
+                                                  const SizedBox(width: 4),
+                                                  Text(m.zone!, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                                ],
                                               ],
                                             ),
                                           ],
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.edit, color: Colors.blue),
-                                        onPressed: () => _showZonalMemberDialog(context, member: m, defaultZone: 'Executive Committee'),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.delete, color: AppColors.error),
-                                        onPressed: () => _confirmDelete(
-                                          context,
-                                          title: 'Delete Member',
-                                          content: 'Are you sure you want to delete ${m.name}?',
-                                          onConfirm: () => provider.deleteMember(m.id),
                                         ),
                                       ),
                                     ],
@@ -3195,15 +3196,15 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   }
 
   Widget _buildZonalCommitteeView(BuildContext context) {
-    final provider = context.watch<ZonalProvider>();
     final adminProvider = context.watch<AdminProvider>();
     final isZonalAdmin = adminProvider.isZonalAdmin;
     final adminZone = adminProvider.zonalAdminZone;
 
-    final members = provider.members.where((m) {
-      if (m.zone.toLowerCase().contains('executive')) return false;
+    final members = adminProvider.approvedUsers.where((m) {
+      final des = m.designation?.trim().toLowerCase() ?? '';
+      if (des != 'zonal committee member') return false;
       if (isZonalAdmin && adminZone != null && adminZone.isNotEmpty) {
-        final mZone = m.zone.trim().toLowerCase();
+        final mZone = (m.zone ?? '').trim().toLowerCase();
         final aZone = adminZone.trim().toLowerCase();
         if (mZone == aZone) return true;
         final mClean = mZone.replaceAll(RegExp(r'\bzone\b'), '').trim();
@@ -3226,27 +3227,17 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Zonal Committee Members Management',
+                'Zonal Committee Members Management (${members.length})',
                 style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold),
-              ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.brandPrimary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: AppRadius.borderMd),
-                ),
-                onPressed: () => _showZonalMemberDialog(context),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add Zonal Member'),
               ),
             ],
           ),
         ),
         Expanded(
-          child: provider.isLoading
+          child: adminProvider.isLoading
               ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
-              : provider.error != null
-                  ? Center(child: Text(provider.error!, style: const TextStyle(color: AppColors.error)))
+              : adminProvider.error != null
+                  ? Center(child: Text(adminProvider.error!, style: const TextStyle(color: AppColors.error)))
                   : members.isEmpty
                       ? const Center(child: Text('No zonal committee members found.'))
                       : ListView.builder(
@@ -3254,6 +3245,19 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                           itemCount: members.length,
                           itemBuilder: (context, index) {
                             final m = members[index];
+                            if (m.profileImageId != null && m.profileImageId!.isNotEmpty && !adminProvider.userImages.containsKey(m.uid)) {
+                              adminProvider.fetchUserImage(m.profileImageId!, m.uid);
+                            }
+                            final imgBase64 = adminProvider.userImages[m.uid];
+                            ImageProvider? imageProvider;
+                            if (m.profileImageId != null && m.profileImageId!.startsWith('http')) {
+                              imageProvider = NetworkImage(m.profileImageId!);
+                            } else if (imgBase64 != null && imgBase64.isNotEmpty) {
+                              try {
+                                imageProvider = MemoryImage(base64Decode(imgBase64));
+                              } catch (_) {}
+                            }
+
                             return Container(
                               margin: const EdgeInsets.only(bottom: AppSpacing.md),
                               child: _buildCardWrapper(
@@ -3264,11 +3268,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                       CircleAvatar(
                                         radius: 28,
                                         backgroundColor: AppColors.brandSecondary.withValues(alpha: 0.06),
-                                        backgroundImage: m.photoBase64 != null
-                                            ? MemoryImage(base64Decode(m.photoBase64!))
-                                            : null,
-                                        child: m.photoBase64 == null
-                                            ? const Icon(Icons.person, color: AppColors.brandPrimary, size: 28)
+                                        backgroundImage: imageProvider,
+                                        child: imageProvider == null
+                                            ? Text(
+                                                m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
+                                                style: const TextStyle(color: AppColors.brandPrimary, fontWeight: FontWeight.bold, fontSize: 18),
+                                              )
                                             : null,
                                       ),
                                       const SizedBox(width: AppSpacing.md),
@@ -3282,7 +3287,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
-                                              '${m.designation} | Zone: ${m.zone}',
+                                              '${m.designation ?? "Zonal Committee Member"} | Zone: ${m.zone ?? "N/A"}',
                                               style: const TextStyle(
                                                 color: AppColors.brandPrimary,
                                                 fontWeight: FontWeight.bold,
@@ -3296,25 +3301,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                                 const SizedBox(width: 4),
                                                 Text(m.phoneNumber, style: const TextStyle(fontSize: 11, color: Colors.grey)),
                                                 const SizedBox(width: AppSpacing.md),
-                                                const Icon(Icons.email, size: 12, color: Colors.grey),
+                                                const Icon(Icons.badge_outlined, size: 12, color: Colors.grey),
                                                 const SizedBox(width: 4),
-                                                Text(m.email, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                                Text(m.membershipId ?? 'N/A', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                                               ],
                                             ),
                                           ],
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.edit, color: Colors.blue),
-                                        onPressed: () => _showZonalMemberDialog(context, member: m),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.delete, color: AppColors.error),
-                                        onPressed: () => _confirmDelete(
-                                          context,
-                                          title: 'Delete Member',
-                                          content: 'Are you sure you want to delete ${m.name}?',
-                                          onConfirm: () => provider.deleteMember(m.id),
                                         ),
                                       ),
                                     ],

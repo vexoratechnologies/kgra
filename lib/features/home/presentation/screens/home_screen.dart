@@ -60,7 +60,10 @@ class _HomeScreenState extends State<HomeScreen> {
       context.read<LiveSessionProvider>().fetchLiveSessions();
       context.read<UpdatesProvider>().fetchUpdates();
       context.read<GovernmentOrdersProvider>().fetchAllOrders();
-      context.read<NotificationProvider>().fetchNotifications();
+      final auth = context.read<AuthProvider>();
+      final notif = context.read<NotificationProvider>();
+      notif.setActiveUserId(auth.currentUser?.uid);
+      notif.fetchNotifications();
     });
   }
 

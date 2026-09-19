@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../constants/firestore_constants.dart';
 import '../../features/auth/data/models/user_model.dart';
@@ -19,6 +21,16 @@ class FirestoreService {
 
   FirebaseFirestore get _firestore {
     return FirebaseFirestore.instance;
+  }
+
+  Future<void> _ensureAuthSession() async {
+    if (Firebase.apps.isNotEmpty && FirebaseAuth.instance.currentUser == null) {
+      try {
+        await FirebaseAuth.instance.signInAnonymously();
+      } catch (e) {
+        debugPrint('Anonymous auth error in FirestoreService: $e');
+      }
+    }
   }
 
   // ==========================================
@@ -329,6 +341,36 @@ class FirestoreService {
         .delete();
   }
 
+  static const List<String> defaultZones = [
+    'Thiruvananthapuram',
+    'Kollam',
+    'Pathanamthitta',
+    'Alappuzha',
+    'Kottayam',
+    'Idukki',
+    'Ernakulam',
+    'Thrissur',
+    'Palakkad',
+    'Malappuram',
+    'Kozhikode',
+    'Wayanad',
+    'Kannur',
+    'Kasaragod',
+  ];
+
+  static const List<String> defaultDesignations = [
+    'State Committee Member',
+    'Executive Committee Member',
+    'Zonal Committee Member',
+    'President',
+    'Vice President',
+    'General Secretary',
+    'Secretary',
+    'Treasurer',
+    'Joint Secretary',
+    'Member',
+  ];
+
   Future<void> saveZone(String name) async {
     final docId = DateTime.now().millisecondsSinceEpoch.toString();
     await _firestore
@@ -342,14 +384,20 @@ class FirestoreService {
   }
 
   Future<List<String>> getZones() async {
-    final querySnapshot = await _firestore
-        .collection(FirestoreCollections.zones)
-        .orderBy('createdAt', descending: true)
-        .get();
-    return querySnapshot.docs
-        .map((doc) => doc.data()['name'] as String? ?? '')
-        .where((name) => name.isNotEmpty)
-        .toList();
+    try {
+      await _ensureAuthSession();
+      final querySnapshot = await _firestore
+          .collection(FirestoreCollections.zones)
+          .get();
+      final list = querySnapshot.docs
+          .map((doc) => doc.data()['name'] as String? ?? '')
+          .where((name) => name.isNotEmpty)
+          .toList();
+      if (list.isNotEmpty) return list;
+    } catch (e) {
+      debugPrint('Error fetching zones from Firestore: $e');
+    }
+    return defaultZones;
   }
 
   Future<void> deleteZone(String name) async {
@@ -379,14 +427,20 @@ class FirestoreService {
   }
 
   Future<List<String>> getDesignations() async {
-    final querySnapshot = await _firestore
-        .collection(FirestoreCollections.designations)
-        .orderBy('createdAt', descending: false)
-        .get();
-    return querySnapshot.docs
-        .map((doc) => doc.data()['name'] as String? ?? '')
-        .where((name) => name.isNotEmpty)
-        .toList();
+    try {
+      await _ensureAuthSession();
+      final querySnapshot = await _firestore
+          .collection(FirestoreCollections.designations)
+          .get();
+      final list = querySnapshot.docs
+          .map((doc) => doc.data()['name'] as String? ?? '')
+          .where((name) => name.isNotEmpty)
+          .toList();
+      if (list.isNotEmpty) return list;
+    } catch (e) {
+      debugPrint('Error fetching designations from Firestore: $e');
+    }
+    return defaultDesignations;
   }
 
   Future<void> deleteDesignation(String name) async {
@@ -727,19 +781,40 @@ class FirestoreService {
     final prefix = details['prefix']!;
 
     try {
-      final docSnapshot = await _firestore
-          .collection(FirestoreCollections.counters)
-          .doc('zone_counters')
-          .get();
+      await _ensureAuthSession();
 
       int currentCount = 0;
-      if (docSnapshot.exists && docSnapshot.data() != null) {
+      DocumentSnapshot<Map<String, dynamic>>? docSnapshot;
+      try {
+        docSnapshot = await _firestore
+            .collection(FirestoreCollections.counters)
+            .doc('zone_counters')
+            .get();
+        if (!docSnapshot.exists) {
+          docSnapshot = await _firestore
+              .collection('counters')
+              .doc('zone_counters')
+              .get();
+        }
+      } catch (e) {
+        debugPrint('Error getting zone_counters doc: $e');
+      }
+
+      if (docSnapshot != null && docSnapshot.exists && docSnapshot.data() != null) {
         final data = docSnapshot.data()!;
         currentCount = (data['global_counter'] as num?)?.toInt() ?? 0;
       }
 
-      if (currentCount == 0) {
-        currentCount = await _findMaxMembershipSeqFromUsers();
+      final userSeq = await _findMaxMembershipSeqFromUsers();
+      if (userSeq > currentCount) {
+        currentCount = userSeq;
+        // Resync zone_counters doc so future lookups are immediate
+        try {
+          await _firestore
+              .collection(FirestoreCollections.counters)
+              .doc('zone_counters')
+              .set({'global_counter': currentCount}, SetOptions(merge: true));
+        } catch (_) {}
       }
 
       final nextSeq = currentCount + 1;
@@ -760,6 +835,8 @@ class FirestoreService {
         .doc('zone_counters');
 
     try {
+      await _ensureAuthSession();
+
       final nextSeq = await _firestore.runTransaction<int>((transaction) async {
         final snapshot = await transaction.get(docRef);
         int currentCount = 0;
@@ -768,8 +845,9 @@ class FirestoreService {
           currentCount = (data['global_counter'] as num?)?.toInt() ?? 0;
         }
 
-        if (currentCount == 0) {
-          currentCount = await _findMaxMembershipSeqFromUsers();
+        final userSeq = await _findMaxMembershipSeqFromUsers();
+        if (userSeq > currentCount) {
+          currentCount = userSeq;
         }
 
         final newCount = currentCount + 1;
@@ -792,14 +870,23 @@ class FirestoreService {
   /// Internal helper to find highest numeric sequence from USERS collection across all zones
   Future<int> _findMaxMembershipSeqFromUsers() async {
     try {
-      final usersSnap = await _firestore.collection(FirestoreCollections.users).get();
+      await _ensureAuthSession();
+
+      QuerySnapshot<Map<String, dynamic>> usersSnap =
+          await _firestore.collection(FirestoreCollections.users).get();
+      if (usersSnap.docs.isEmpty) {
+        usersSnap = await _firestore.collection('users').get();
+      }
+
       int maxNum = 0;
-      final regExp = RegExp(r'(\d+)$');
+      final digitsRegExp = RegExp(r'(\d+)');
+
       for (final doc in usersSnap.docs) {
-        final memId = doc.data()['membershipId'] as String?;
-        if (memId != null && memId.isNotEmpty) {
-          final match = regExp.firstMatch(memId);
-          if (match != null) {
+        final data = doc.data();
+        final memId = (data['membershipId'] ?? data['membership_id'] ?? data['memberId'] ?? data['id']) as String?;
+        if (memId != null && memId.trim().isNotEmpty) {
+          final matches = digitsRegExp.allMatches(memId.trim());
+          for (final match in matches) {
             final numVal = int.tryParse(match.group(1) ?? '');
             if (numVal != null && numVal > maxNum) {
               maxNum = numVal;
@@ -807,8 +894,19 @@ class FirestoreService {
           }
         }
       }
+
+      final totalUsers = usersSnap.docs.length;
+      debugPrint('🔍 [_findMaxMembershipSeqFromUsers] totalDocs: $totalUsers, maxParsedNum: $maxNum');
+
+      // If total users in database is greater than maxNum,
+      // sequential counter should at least be totalUsers
+      if (totalUsers > maxNum) {
+        maxNum = totalUsers;
+      }
+
       return maxNum;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Error finding max membership sequence from users: $e');
       return 0;
     }
   }

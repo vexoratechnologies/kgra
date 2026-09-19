@@ -323,7 +323,7 @@ class AuthProvider extends ChangeNotifier {
       }
 
       String? finalMembershipId = membershipId;
-      if ((finalMembershipId == null || finalMembershipId.trim().isEmpty) && zone != null && zone.isNotEmpty) {
+      if (zone != null && zone.isNotEmpty) {
         finalMembershipId = await _authRepository.generateNextMembershipId(zone);
       }
 
@@ -385,7 +385,7 @@ class AuthProvider extends ChangeNotifier {
       }
 
       String? finalMembershipId = membershipId;
-      if ((finalMembershipId == null || finalMembershipId.trim().isEmpty) && zone != null && zone.isNotEmpty) {
+      if (zone != null && zone.isNotEmpty) {
         finalMembershipId = await _authRepository.generateNextMembershipId(zone);
       }
 

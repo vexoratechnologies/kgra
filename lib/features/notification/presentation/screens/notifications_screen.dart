@@ -7,6 +7,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_style.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/widgets/compact_app_bar.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/notification_provider.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -25,7 +26,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     super.initState();
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = context.read<AuthProvider>();
       final notif = context.read<NotificationProvider>();
+      notif.setActiveUserId(auth.currentUser?.uid);
       notif.fetchNotifications().then((_) {
         if (widget.showBackButton) {
           notif.markAllAsRead();
@@ -70,6 +73,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         child: RefreshIndicator(
           color: AppColors.brandPrimary,
           onRefresh: () async {
+            final auth = context.read<AuthProvider>();
+            provider.setActiveUserId(auth.currentUser?.uid);
             await provider.fetchNotifications();
             provider.markAllAsRead();
           },

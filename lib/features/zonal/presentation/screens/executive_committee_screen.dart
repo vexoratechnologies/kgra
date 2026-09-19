@@ -8,7 +8,7 @@ import '../../../../core/theme/app_text_style.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/widgets/compact_app_bar.dart';
-import '../providers/zonal_provider.dart';
+import '../../../admin/presentation/providers/admin_provider.dart';
 
 /// ExecutiveCommitteeScreen renders the list of Executive Committee members.
 class ExecutiveCommitteeScreen extends StatefulWidget {
@@ -26,7 +26,7 @@ class _ExecutiveCommitteeScreenState extends State<ExecutiveCommitteeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ZonalProvider>().fetchMembers();
+      context.read<AdminProvider>().fetchApprovedUsers();
     });
   }
 
@@ -38,13 +38,15 @@ class _ExecutiveCommitteeScreenState extends State<ExecutiveCommitteeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final zonalProvider = context.watch<ZonalProvider>();
+    final adminProvider = context.watch<AdminProvider>();
     
-    // Filter only members where zone == 'Executive Committee'
-    final execMembers = zonalProvider.members.where((m) {
-      final isExec = m.zone.toLowerCase().contains('executive');
+    final execMembers = adminProvider.approvedUsers.where((m) {
+      final des = m.designation?.trim().toLowerCase() ?? '';
+      final isExec = des == 'executive committee member' || des == 'executive commitee member';
       final matchesQuery = m.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          m.designation.toLowerCase().contains(_searchQuery.toLowerCase());
+          des.contains(_searchQuery.toLowerCase()) ||
+          m.phoneNumber.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          (m.zone ?? '').toLowerCase().contains(_searchQuery.toLowerCase());
       return isExec && matchesQuery;
     }).toList();
 
@@ -73,7 +75,7 @@ class _ExecutiveCommitteeScreenState extends State<ExecutiveCommitteeScreen> {
                 controller: _searchController,
                 onChanged: (v) => setState(() => _searchQuery = v),
                 decoration: InputDecoration(
-                  hintText: 'Search executive members by name or designation...',
+                  hintText: 'Search executive members by name, designation, zone...',
                   prefixIcon: const Icon(Icons.search),
                   filled: true,
                   fillColor: AppColors.brandSecondary.withValues(alpha: 0.03),
@@ -86,10 +88,10 @@ class _ExecutiveCommitteeScreenState extends State<ExecutiveCommitteeScreen> {
             ),
             
             Expanded(
-              child: zonalProvider.isLoading
+              child: adminProvider.isLoading
                   ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
-                  : zonalProvider.error != null
-                      ? Center(child: Text(zonalProvider.error!, style: const TextStyle(color: AppColors.error)))
+                  : adminProvider.error != null
+                      ? Center(child: Text(adminProvider.error!, style: const TextStyle(color: AppColors.error)))
                       : execMembers.isEmpty
                           ? Center(
                               child: Column(
@@ -100,7 +102,7 @@ class _ExecutiveCommitteeScreenState extends State<ExecutiveCommitteeScreen> {
                                   Text(
                                     _searchQuery.isNotEmpty 
                                         ? 'No executive members match search' 
-                                        : 'No executive committee members found',
+                                        : 'No Executive Committee members found',
                                     style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
                                   ),
                                 ],
@@ -111,6 +113,21 @@ class _ExecutiveCommitteeScreenState extends State<ExecutiveCommitteeScreen> {
                               itemCount: execMembers.length,
                               itemBuilder: (context, index) {
                                 final m = execMembers[index];
+                                if (m.profileImageId != null &&
+                                    m.profileImageId!.isNotEmpty &&
+                                    !adminProvider.userImages.containsKey(m.uid)) {
+                                  adminProvider.fetchUserImage(m.profileImageId!, m.uid);
+                                }
+                                final imgBase64 = adminProvider.userImages[m.uid];
+                                ImageProvider? imageProvider;
+                                if (m.profileImageId != null && m.profileImageId!.startsWith('http')) {
+                                  imageProvider = NetworkImage(m.profileImageId!);
+                                } else if (imgBase64 != null && imgBase64.isNotEmpty) {
+                                  try {
+                                    imageProvider = MemoryImage(base64Decode(imgBase64));
+                                  } catch (_) {}
+                                }
+
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: AppSpacing.md),
                                   decoration: BoxDecoration(
@@ -132,11 +149,16 @@ class _ExecutiveCommitteeScreenState extends State<ExecutiveCommitteeScreen> {
                                         CircleAvatar(
                                           radius: 30,
                                           backgroundColor: AppColors.brandSecondary.withValues(alpha: 0.06),
-                                          backgroundImage: m.photoBase64 != null
-                                              ? MemoryImage(base64Decode(m.photoBase64!))
-                                              : null,
-                                          child: m.photoBase64 == null
-                                              ? const Icon(Icons.person, color: AppColors.brandPrimary, size: 30)
+                                          backgroundImage: imageProvider,
+                                          child: imageProvider == null
+                                              ? Text(
+                                                  m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
+                                                  style: const TextStyle(
+                                                    color: AppColors.brandPrimary,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 20,
+                                                  ),
+                                                )
                                               : null,
                                         ),
                                         const SizedBox(width: AppSpacing.md),
@@ -153,7 +175,7 @@ class _ExecutiveCommitteeScreenState extends State<ExecutiveCommitteeScreen> {
                                               ),
                                               const SizedBox(height: 2),
                                               Text(
-                                                m.designation,
+                                                m.designation ?? 'Executive Committee Member',
                                                 style: const TextStyle(
                                                   color: AppColors.brandPrimary,
                                                   fontWeight: FontWeight.bold,
@@ -161,23 +183,27 @@ class _ExecutiveCommitteeScreenState extends State<ExecutiveCommitteeScreen> {
                                                 ),
                                               ),
                                               const SizedBox(height: 8),
-                                              Row(
+                                              Wrap(
+                                                spacing: 12,
+                                                runSpacing: 4,
                                                 children: [
-                                                  const Icon(Icons.phone, size: 14, color: AppColors.onSurfaceVariant),
-                                                  const SizedBox(width: 4),
-                                                  Text(m.phoneNumber, style: const TextStyle(fontSize: 12, color: AppColors.brandSecondary)),
-                                                  if (m.email.isNotEmpty) ...[
-                                                    const SizedBox(width: AppSpacing.lg),
-                                                    const Icon(Icons.email, size: 14, color: AppColors.onSurfaceVariant),
-                                                    const SizedBox(width: 4),
-                                                    Expanded(
-                                                      child: Text(
-                                                        m.email,
-                                                        overflow: TextOverflow.ellipsis,
-                                                        style: const TextStyle(fontSize: 12, color: AppColors.brandSecondary),
-                                                      ),
+                                                  Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      const Icon(Icons.phone, size: 14, color: AppColors.onSurfaceVariant),
+                                                      const SizedBox(width: 4),
+                                                      Text(m.phoneNumber, style: const TextStyle(fontSize: 12, color: AppColors.brandSecondary)),
+                                                    ],
+                                                  ),
+                                                  if (m.zone != null && m.zone!.isNotEmpty)
+                                                    Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        const Icon(Icons.map_outlined, size: 14, color: AppColors.onSurfaceVariant),
+                                                        const SizedBox(width: 4),
+                                                        Text(m.zone!, style: const TextStyle(fontSize: 12, color: AppColors.brandSecondary)),
+                                                      ],
                                                     ),
-                                                  ],
                                                 ],
                                               ),
                                             ],
