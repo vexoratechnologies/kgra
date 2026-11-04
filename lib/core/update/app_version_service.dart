@@ -36,11 +36,21 @@ class AppVersionService {
   /// Cached package information
   PackageInfo? get packageInfo => _packageInfo;
 
-  /// Current build number extracted from app metadata (e.g. '4' from 1.0.0+4)
-  String get currentBuildNumber => _packageInfo?.buildNumber ?? '4';
+  /// Current build number extracted from app metadata (e.g. '16' from 1.0.8+16)
+  String get currentBuildNumber {
+    if (_packageInfo == null) {
+      init();
+    }
+    return _packageInfo?.buildNumber ?? '16';
+  }
 
-  /// Current version name (e.g. '1.0.0')
-  String get currentVersionName => _packageInfo?.version ?? '1.0.0';
+  /// Current version name (e.g. '1.0.8')
+  String get currentVersionName {
+    if (_packageInfo == null) {
+      init();
+    }
+    return _packageInfo?.version ?? '1.0.8';
+  }
 
   /// Whether the app is currently force-locked
   bool get isLocked => updateConfigNotifier.value != null;
@@ -69,20 +79,30 @@ class AppVersionService {
       databaseURL: dbUrl,
     );
 
-    final DatabaseReference ref = db.ref(rootNode);
-    debugPrint('[AppVersionService] Connecting to Realtime Database at $dbUrl, path: $rootNode');
+    // Listen to root so it works whether fields are placed directly at root '/' or inside node '0'
+    final DatabaseReference ref = db.ref();
+    debugPrint('[AppVersionService] Connecting to Realtime Database at $dbUrl (auto-supporting root & node "0")');
 
     _versionSubscription = ref.onValue.listen(
-      (DatabaseEvent event) {
-        final data = event.snapshot.value;
-        debugPrint('[AppVersionService] Received Realtime Database snapshot: $data');
+      (DatabaseEvent event) async {
+        if (_packageInfo == null) {
+          await init();
+        }
+        final rawData = event.snapshot.value;
+        debugPrint('[AppVersionService] Received Realtime Database snapshot: $rawData');
 
-        if (data == null || data is! Map) {
-          debugPrint('[AppVersionService] Node "$rootNode" does not exist or is empty.');
+        if (rawData == null || rawData is! Map) {
+          debugPrint('[AppVersionService] Realtime Database snapshot is empty or null.');
           return;
         }
 
-        final config = Map<String, dynamic>.from(data);
+        final rootMap = Map<String, dynamic>.from(rawData);
+        final Map<String, dynamic> config;
+        if (rootMap['0'] is Map) {
+          config = Map<String, dynamic>.from(rootMap['0'] as Map);
+        } else {
+          config = rootMap;
+        }
 
         // Determine platform-specific keys
         final bool isIosPlatform = !kIsWeb && Platform.isIOS;
@@ -125,12 +145,17 @@ class AppVersionService {
         .toList();
 
     final String localBuild = currentBuildNumber;
+    final String localVersion = currentVersionName;
+    final String fullVersion = '$localVersion+$localBuild';
 
-    // The app is allowed ONLY if allowedList is not empty AND contains localBuild
-    final bool isAllowed = allowedList.isNotEmpty && allowedList.contains(localBuild);
+    // The app is allowed ONLY if allowedList is not empty AND contains localBuild, localVersion, or fullVersion
+    final bool isAllowed = allowedList.isNotEmpty &&
+        (allowedList.contains(localBuild) ||
+         allowedList.contains(localVersion) ||
+         allowedList.contains(fullVersion));
 
     debugPrint(
-      '[AppVersionService] Checking build: "$localBuild" vs allowed: $allowedList -> ${isAllowed ? "PASS (Unlocked)" : "LOCK (Force Update)"}',
+      '[AppVersionService] Checking build: "$localBuild" (v$localVersion) vs allowed: $allowedList -> ${isAllowed ? "PASS (Unlocked)" : "LOCK (Force Update)"}',
     );
 
     if (!isAllowed) {

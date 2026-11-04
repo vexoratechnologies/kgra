@@ -9,6 +9,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/widgets/compact_app_bar.dart';
 import '../../../../core/utils/app_date_formatter.dart';
+import '../../../../core/update/app_version_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
 /// ProfileScreen displays the member's profile card, personal information,
@@ -559,6 +560,29 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
+            Center(
+              child: Column(
+                children: [
+                  Text(
+                    'Version ${AppVersionService.instance.currentVersionName} (Build ${AppVersionService.instance.currentBuildNumber})',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Kerala Govt Radiographers Association',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFFCBD5E1),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
           ],
         ),
       ),

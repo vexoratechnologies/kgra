@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../providers/auth_provider.dart';
 import '../../../admin/presentation/providers/admin_provider.dart';
+import '../../../payment/presentation/providers/payment_provider.dart';
 
 /// UserSplashScreen loads the app state, checks auth session, and redirects.
 /// It features a background image and a centered logo branding block with bottom loading animation.
@@ -54,14 +55,17 @@ class _UserSplashScreenState extends State<UserSplashScreen> with TickerProvider
   Future<void> _initApp() async {
     final startTime = DateTime.now();
 
-    // Start session checking and state restoration in parallel
+    // Start session checking, payment config prefetching, and state restoration in parallel
     final adminProvider = context.read<AdminProvider>();
     final checkAdminFuture = adminProvider.checkAdminSession();
     
     final authProvider = context.read<AuthProvider>();
     final checkAuthFuture = authProvider.checkAuthStatus();
 
-    await Future.wait([checkAdminFuture, checkAuthFuture]);
+    final paymentProvider = context.read<PaymentProvider>();
+    final checkPaymentFuture = paymentProvider.waitForConfig();
+
+    await Future.wait([checkAdminFuture, checkAuthFuture, checkPaymentFuture]);
 
     // Ensure splash screen brand exposure of at least 2500ms
     final elapsed = DateTime.now().difference(startTime);

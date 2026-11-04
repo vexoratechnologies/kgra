@@ -6,6 +6,7 @@ import '../../../../core/widgets/compact_app_bar.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_style.dart';
+import '../../../../core/update/app_version_service.dart';
 
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
@@ -127,7 +128,7 @@ class AboutScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      'Version 1.0.0',
+                      'Version ${AppVersionService.instance.currentVersionName} (Build ${AppVersionService.instance.currentBuildNumber})',
                       style: AppTextStyle.labelSm(color: AppColors.brandPrimary).copyWith(
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.5,

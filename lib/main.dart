@@ -16,16 +16,32 @@ void main() async {
   // Ensure Flutter engine bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase (safely catch errors in case configurations are not yet generated)
+  // Initialize Firebase
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+  } catch (e) {
+    debugPrint('Firebase initializeApp notice: $e');
+  }
 
-    // Initialize Push Notifications
+  // Initialize Remote App Lock & Version Checker independently (must run even if push fails)
+  try {
+    await AppVersionService.instance.init();
+    AppVersionService.instance.startVersionListener();
+  } catch (e) {
+    debugPrint('AppVersionService init notice: $e');
+  }
+
+  // Initialize Push Notifications safely in separate try-catch so APNs/FCM errors never block version lock
+  try {
     await PushNotificationService.instance.initialize();
+  } catch (e) {
+    debugPrint('PushNotificationService init notice: $e');
+  }
 
-    // Establish an anonymous session in background without blocking initial frame
+  // Establish an anonymous session in background without blocking initial frame
+  try {
     final auth = FirebaseAuth.instance;
     if (auth.currentUser == null) {
       auth.signInAnonymously().then((_) {
@@ -34,14 +50,8 @@ void main() async {
         debugPrint('Startup anonymous auth error: $e');
       });
     }
-
-    // Initialize Remote App Lock & Version Checker
-    await AppVersionService.instance.init();
-    AppVersionService.instance.startVersionListener(
-      rootNode: '0',
-    );
   } catch (e) {
-    debugPrint('Firebase not initialized: $e');
+    debugPrint('FirebaseAuth notice: $e');
   }
 
   // Initialize Dependency Injection

@@ -39,6 +39,8 @@ import '../../../../features/events/presentation/providers/event_provider.dart';
 import '../../../../features/events/data/models/event_model.dart';
 import '../providers/admin_provider.dart';
 import '../../../notification/presentation/providers/notification_provider.dart';
+import '../../../../core/utils/committee_helper.dart';
+import '../widgets/add_committee_member_dialog.dart';
 
 
 /// AdminUsersScreen lists pending registration requests and supports approved/rejected tabs.
@@ -1752,9 +1754,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   Widget _buildCommitteeMembersView(BuildContext context) {
     final adminProvider = context.watch<AdminProvider>();
     final members = adminProvider.approvedUsers.where((m) {
-      final des = m.designation?.trim().toLowerCase() ?? '';
-      return des == 'state committee member';
+      return CommitteeHelper.isStateCommitteeMember(m);
     }).toList();
+    final sortedMembers = CommitteeHelper.sortMembers(members, true);
 
     return Column(
       children: [
@@ -1768,8 +1770,18 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'State Committee Members Management (${members.length})',
+                'State Committee Members Management (${sortedMembers.length})',
                 style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold),
+              ),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.person_add, size: 18),
+                label: const Text('Add Member'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brandPrimary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
+                onPressed: () => AddCommitteeMemberDialog.show(context, isState: true),
               ),
             ],
           ),
@@ -1779,13 +1791,13 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
               : adminProvider.error != null
                   ? Center(child: Text(adminProvider.error!, style: const TextStyle(color: AppColors.error)))
-                  : members.isEmpty
+                  : sortedMembers.isEmpty
                       ? const Center(child: Text('No committee members found.'))
                       : ListView.builder(
                           padding: const EdgeInsets.all(AppSpacing.xl),
-                          itemCount: members.length,
+                          itemCount: sortedMembers.length,
                           itemBuilder: (context, index) {
-                            final m = members[index];
+                            final m = sortedMembers[index];
                             if (m.profileImageId != null && m.profileImageId!.isNotEmpty && !adminProvider.userImages.containsKey(m.uid)) {
                               adminProvider.fetchUserImage(m.profileImageId!, m.uid);
                             }
@@ -1798,6 +1810,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                 imageProvider = MemoryImage(base64Decode(imgBase64));
                               } catch (_) {}
                             }
+
+                            final displayDes = CommitteeHelper.getDisplayDesignation(m, true);
 
                             return Container(
                               margin: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -1828,7 +1842,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
-                                              m.designation ?? 'State Committee Member',
+                                              displayDes,
                                               style: const TextStyle(color: AppColors.brandPrimary, fontWeight: FontWeight.w600, fontSize: 12),
                                             ),
                                             const SizedBox(height: 4),
@@ -1851,6 +1865,30 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                             ),
                                           ],
                                         ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                                        tooltip: 'Remove from State Committee',
+                                        onPressed: () async {
+                                          final confirm = await showDialog<bool>(
+                                            context: context,
+                                            builder: (ctx) => AlertDialog(
+                                              title: const Text('Remove from State Committee?'),
+                                              content: Text('Are you sure you want to remove ${m.name} ($displayDes) from the State Committee?'),
+                                              actions: [
+                                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                                ElevatedButton(
+                                                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+                                                  onPressed: () => Navigator.pop(ctx, true),
+                                                  child: const Text('Remove', style: TextStyle(color: Colors.white)),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                          if (confirm == true && context.mounted) {
+                                            await adminProvider.removeMemberFromCommittee(uid: m.uid, isState: true);
+                                          }
+                                        },
                                       ),
                                     ],
                                   ),
@@ -3079,9 +3117,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   Widget _buildExecutiveCommitteeView(BuildContext context) {
     final adminProvider = context.watch<AdminProvider>();
     final members = adminProvider.approvedUsers.where((m) {
-      final des = m.designation?.trim().toLowerCase() ?? '';
-      return des == 'executive committee member' || des == 'executive commitee member';
+      return CommitteeHelper.isExecutiveCommitteeMember(m);
     }).toList();
+    final sortedMembers = CommitteeHelper.sortMembers(members, false);
 
     return Column(
       children: [
@@ -3095,8 +3133,18 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Executive Committee Members Management (${members.length})',
+                'Executive Committee Members Management (${sortedMembers.length})',
                 style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold),
+              ),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.person_add, size: 18),
+                label: const Text('Add Member'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brandPrimary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
+                onPressed: () => AddCommitteeMemberDialog.show(context, isState: false),
               ),
             ],
           ),
@@ -3106,13 +3154,13 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
               : adminProvider.error != null
                   ? Center(child: Text(adminProvider.error!, style: const TextStyle(color: AppColors.error)))
-                  : members.isEmpty
+                  : sortedMembers.isEmpty
                       ? const Center(child: Text('No executive committee members found.'))
                       : ListView.builder(
                           padding: const EdgeInsets.all(AppSpacing.xl),
-                          itemCount: members.length,
+                          itemCount: sortedMembers.length,
                           itemBuilder: (context, index) {
-                            final m = members[index];
+                            final m = sortedMembers[index];
                             if (m.profileImageId != null && m.profileImageId!.isNotEmpty && !adminProvider.userImages.containsKey(m.uid)) {
                               adminProvider.fetchUserImage(m.profileImageId!, m.uid);
                             }
@@ -3125,6 +3173,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                 imageProvider = MemoryImage(base64Decode(imgBase64));
                               } catch (_) {}
                             }
+
+                            final displayDes = CommitteeHelper.getDisplayDesignation(m, false);
 
                             return Container(
                               margin: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -3155,7 +3205,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
-                                              m.designation ?? 'Executive Committee Member',
+                                              displayDes,
                                               style: const TextStyle(
                                                 color: AppColors.brandPrimary,
                                                 fontWeight: FontWeight.bold,
@@ -3183,6 +3233,30 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                           ],
                                         ),
                                       ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                                        tooltip: 'Remove from Executive Committee',
+                                        onPressed: () async {
+                                          final confirm = await showDialog<bool>(
+                                            context: context,
+                                            builder: (ctx) => AlertDialog(
+                                              title: const Text('Remove from Executive Committee?'),
+                                              content: Text('Are you sure you want to remove ${m.name} ($displayDes) from the Executive Committee?'),
+                                              actions: [
+                                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                                ElevatedButton(
+                                                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+                                                  onPressed: () => Navigator.pop(ctx, true),
+                                                  child: const Text('Remove', style: TextStyle(color: Colors.white)),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                          if (confirm == true && context.mounted) {
+                                            await adminProvider.removeMemberFromCommittee(uid: m.uid, isState: false);
+                                          }
+                                        },
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -3200,20 +3274,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final isZonalAdmin = adminProvider.isZonalAdmin;
     final adminZone = adminProvider.zonalAdminZone;
 
-    final members = adminProvider.approvedUsers.where((m) {
-      final des = m.designation?.trim().toLowerCase() ?? '';
-      if (des != 'zonal committee member') return false;
+    final members = CommitteeHelper.sortZonalMembers(adminProvider.approvedUsers.where((m) {
       if (isZonalAdmin && adminZone != null && adminZone.isNotEmpty) {
-        final mZone = (m.zone ?? '').trim().toLowerCase();
-        final aZone = adminZone.trim().toLowerCase();
-        if (mZone == aZone) return true;
-        final mClean = mZone.replaceAll(RegExp(r'\bzone\b'), '').trim();
-        final aClean = aZone.replaceAll(RegExp(r'\bzone\b'), '').trim();
-        if (mClean.isNotEmpty && aClean.isNotEmpty && mClean == aClean) return true;
-        return mZone.contains(aZone) || aZone.contains(mZone);
+        return CommitteeHelper.matchesZone(m.zone, adminZone);
       }
       return true;
-    }).toList();
+    }).toList());
 
     return Column(
       children: [

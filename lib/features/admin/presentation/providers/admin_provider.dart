@@ -395,6 +395,69 @@ class AdminProvider extends ChangeNotifier {
     }
   }
 
+  /// Updates user details and synchronizes the local cache/lists.
+  Future<bool> updateUser(UserModel user) async {
+    _setError(null);
+    try {
+      await _adminRepository.updateUser(user);
+      final idx = _approvedUsers.indexWhere((u) => u.uid == user.uid);
+      if (idx != -1) {
+        _approvedUsers[idx] = user;
+      }
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _setError('Failed to update user: ${e.toString()}');
+      return false;
+    }
+  }
+
+  /// Explicitly adds or updates a member's role in the State Committee or Executive Committee.
+  Future<bool> addMemberToCommittee({
+    required String uid,
+    required bool isState,
+    required String role,
+  }) async {
+    final userIdx = _approvedUsers.indexWhere((u) => u.uid == uid);
+    if (userIdx == -1) return false;
+
+    final user = _approvedUsers[userIdx];
+    final updatedUser = isState
+        ? user.copyWith(stateCommitteeRole: role)
+        : user.copyWith(executiveCommitteeRole: role);
+
+    return await updateUser(updatedUser);
+  }
+
+  /// Removes a member from the State Committee or Executive Committee.
+  Future<bool> removeMemberFromCommittee({
+    required String uid,
+    required bool isState,
+  }) async {
+    final userIdx = _approvedUsers.indexWhere((u) => u.uid == uid);
+    if (userIdx == -1) return false;
+
+    final user = _approvedUsers[userIdx];
+    String? newDesignation = user.designation;
+    if (isState && (user.designation?.trim().toLowerCase() == 'state committee member')) {
+      newDesignation = 'Member';
+    } else if (!isState && (user.designation?.trim().toLowerCase() == 'executive committee member' || user.designation?.trim().toLowerCase() == 'executive commitee member')) {
+      newDesignation = 'Member';
+    }
+
+    final updatedUser = isState
+        ? user.copyWith(
+            designation: newDesignation,
+            clearStateCommitteeRole: true,
+          )
+        : user.copyWith(
+            designation: newDesignation,
+            clearExecutiveCommitteeRole: true,
+          );
+
+    return await updateUser(updatedUser);
+  }
+
   // ==========================================
   // Admin & Zones Operations
   // ==========================================

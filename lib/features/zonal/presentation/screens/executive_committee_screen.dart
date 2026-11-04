@@ -8,7 +8,9 @@ import '../../../../core/theme/app_text_style.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/widgets/compact_app_bar.dart';
+import '../../../../core/utils/committee_helper.dart';
 import '../../../admin/presentation/providers/admin_provider.dart';
+import '../../../admin/presentation/widgets/add_committee_member_dialog.dart';
 
 /// ExecutiveCommitteeScreen renders the list of Executive Committee members.
 class ExecutiveCommitteeScreen extends StatefulWidget {
@@ -39,15 +41,21 @@ class _ExecutiveCommitteeScreenState extends State<ExecutiveCommitteeScreen> {
   @override
   Widget build(BuildContext context) {
     final adminProvider = context.watch<AdminProvider>();
-    
+    final isAdmin = adminProvider.currentAdmin != null;
+
     final execMembers = adminProvider.approvedUsers.where((m) {
-      final des = m.designation?.trim().toLowerCase() ?? '';
-      final isExec = des == 'executive committee member' || des == 'executive commitee member';
-      final matchesQuery = m.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          des.contains(_searchQuery.toLowerCase()) ||
-          m.phoneNumber.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          (m.zone ?? '').toLowerCase().contains(_searchQuery.toLowerCase());
-      return isExec && matchesQuery;
+      return CommitteeHelper.isExecutiveCommitteeMember(m);
+    }).toList();
+
+    final sortedMembers = CommitteeHelper.sortMembers(execMembers, false);
+
+    final filteredMembers = sortedMembers.where((m) {
+      final query = _searchQuery.toLowerCase();
+      final displayDes = CommitteeHelper.getDisplayDesignation(m, false).toLowerCase();
+      return m.name.toLowerCase().contains(query) ||
+          displayDes.contains(query) ||
+          m.phoneNumber.toLowerCase().contains(query) ||
+          (m.zone ?? '').toLowerCase().contains(query);
     }).toList();
 
     return Scaffold(
@@ -92,7 +100,7 @@ class _ExecutiveCommitteeScreenState extends State<ExecutiveCommitteeScreen> {
                   ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
                   : adminProvider.error != null
                       ? Center(child: Text(adminProvider.error!, style: const TextStyle(color: AppColors.error)))
-                      : execMembers.isEmpty
+                      : filteredMembers.isEmpty
                           ? Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -110,9 +118,9 @@ class _ExecutiveCommitteeScreenState extends State<ExecutiveCommitteeScreen> {
                             )
                           : ListView.builder(
                               padding: const EdgeInsets.all(AppSpacing.md),
-                              itemCount: execMembers.length,
+                              itemCount: filteredMembers.length,
                               itemBuilder: (context, index) {
-                                final m = execMembers[index];
+                                final m = filteredMembers[index];
                                 if (m.profileImageId != null &&
                                     m.profileImageId!.isNotEmpty &&
                                     !adminProvider.userImages.containsKey(m.uid)) {
@@ -127,6 +135,8 @@ class _ExecutiveCommitteeScreenState extends State<ExecutiveCommitteeScreen> {
                                     imageProvider = MemoryImage(base64Decode(imgBase64));
                                   } catch (_) {}
                                 }
+
+                                final displayDesignation = CommitteeHelper.getDisplayDesignation(m, false);
 
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -175,7 +185,7 @@ class _ExecutiveCommitteeScreenState extends State<ExecutiveCommitteeScreen> {
                                               ),
                                               const SizedBox(height: 2),
                                               Text(
-                                                m.designation ?? 'Executive Committee Member',
+                                                displayDesignation,
                                                 style: const TextStyle(
                                                   color: AppColors.brandPrimary,
                                                   fontWeight: FontWeight.bold,
@@ -209,6 +219,31 @@ class _ExecutiveCommitteeScreenState extends State<ExecutiveCommitteeScreen> {
                                             ],
                                           ),
                                         ),
+                                        if (isAdmin)
+                                          IconButton(
+                                            icon: const Icon(Icons.remove_circle_outline, color: AppColors.error, size: 20),
+                                            tooltip: 'Remove from Executive Committee',
+                                            onPressed: () async {
+                                              final confirm = await showDialog<bool>(
+                                                context: context,
+                                                builder: (ctx) => AlertDialog(
+                                                  title: const Text('Remove from Executive Committee?'),
+                                                  content: Text('Are you sure you want to remove ${m.name} ($displayDesignation) from the Executive Committee?'),
+                                                  actions: [
+                                                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                                    ElevatedButton(
+                                                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+                                                      onPressed: () => Navigator.pop(ctx, true),
+                                                      child: const Text('Remove', style: TextStyle(color: Colors.white)),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                              if (confirm == true && context.mounted) {
+                                                await adminProvider.removeMemberFromCommittee(uid: m.uid, isState: false);
+                                              }
+                                            },
+                                          ),
                                       ],
                                     ),
                                   ),
@@ -219,6 +254,14 @@ class _ExecutiveCommitteeScreenState extends State<ExecutiveCommitteeScreen> {
           ],
         ),
       ),
+      floatingActionButton: isAdmin
+          ? FloatingActionButton.extended(
+              backgroundColor: AppColors.brandPrimary,
+              icon: const Icon(Icons.person_add, color: Colors.white),
+              label: const Text('Add Member', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              onPressed: () => AddCommitteeMemberDialog.show(context, isState: false),
+            )
+          : null,
     );
   }
 }

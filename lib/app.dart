@@ -16,6 +16,7 @@ import 'features/gallery/presentation/providers/gallery_provider.dart';
 import 'features/videos/presentation/providers/video_provider.dart';
 import 'features/ads/presentation/providers/ad_provider.dart';
 import 'features/events/presentation/providers/event_provider.dart';
+import 'features/payment/presentation/providers/payment_provider.dart';
 import 'core/update/app_version_service.dart';
 import 'core/update/force_update_screen.dart';
 import 'injection.dart';
@@ -71,6 +72,9 @@ class App extends StatelessWidget {
         ),
         ChangeNotifierProvider<EventProvider>(
           create: (_) => locator<EventProvider>(),
+        ),
+        ChangeNotifierProvider<PaymentProvider>(
+          create: (_) => locator<PaymentProvider>(),
         ),
       ],
       child: MaterialApp.router(

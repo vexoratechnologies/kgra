@@ -8,7 +8,9 @@ import '../../../../core/theme/app_text_style.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/widgets/compact_app_bar.dart';
+import '../../../../core/utils/committee_helper.dart';
 import '../../../admin/presentation/providers/admin_provider.dart';
+import '../../../admin/presentation/widgets/add_committee_member_dialog.dart';
 
 class StateCommitteeScreen extends StatefulWidget {
   const StateCommitteeScreen({super.key});
@@ -38,15 +40,19 @@ class _StateCommitteeScreenState extends State<StateCommitteeScreen> {
   @override
   Widget build(BuildContext context) {
     final adminProvider = context.watch<AdminProvider>();
+    final isAdmin = adminProvider.currentAdmin != null;
+
     final stateMembers = adminProvider.approvedUsers.where((m) {
-      final des = m.designation?.trim().toLowerCase() ?? '';
-      return des == 'state committee member';
+      return CommitteeHelper.isStateCommitteeMember(m);
     }).toList();
 
-    final filteredMembers = stateMembers.where((m) {
+    final sortedMembers = CommitteeHelper.sortMembers(stateMembers, true);
+
+    final filteredMembers = sortedMembers.where((m) {
       final query = _searchQuery.toLowerCase();
+      final displayDes = CommitteeHelper.getDisplayDesignation(m, true).toLowerCase();
       return m.name.toLowerCase().contains(query) ||
-          (m.designation ?? '').toLowerCase().contains(query) ||
+          displayDes.contains(query) ||
           m.phoneNumber.toLowerCase().contains(query) ||
           (m.zone ?? '').toLowerCase().contains(query);
     }).toList();
@@ -131,6 +137,8 @@ class _StateCommitteeScreenState extends State<StateCommitteeScreen> {
                                   } catch (_) {}
                                 }
 
+                                final displayDesignation = CommitteeHelper.getDisplayDesignation(m, true);
+
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: AppSpacing.md),
                                   decoration: BoxDecoration(
@@ -178,7 +186,7 @@ class _StateCommitteeScreenState extends State<StateCommitteeScreen> {
                                               ),
                                               const SizedBox(height: 2),
                                               Text(
-                                                m.designation ?? 'State Committee Member',
+                                                displayDesignation,
                                                 style: const TextStyle(
                                                   color: AppColors.brandPrimary,
                                                   fontWeight: FontWeight.bold,
@@ -212,6 +220,31 @@ class _StateCommitteeScreenState extends State<StateCommitteeScreen> {
                                             ],
                                           ),
                                         ),
+                                        if (isAdmin)
+                                          IconButton(
+                                            icon: const Icon(Icons.remove_circle_outline, color: AppColors.error, size: 20),
+                                            tooltip: 'Remove from State Committee',
+                                            onPressed: () async {
+                                              final confirm = await showDialog<bool>(
+                                                context: context,
+                                                builder: (ctx) => AlertDialog(
+                                                  title: const Text('Remove from State Committee?'),
+                                                  content: Text('Are you sure you want to remove ${m.name} ($displayDesignation) from the State Committee?'),
+                                                  actions: [
+                                                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                                    ElevatedButton(
+                                                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+                                                      onPressed: () => Navigator.pop(ctx, true),
+                                                      child: const Text('Remove', style: TextStyle(color: Colors.white)),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                              if (confirm == true && context.mounted) {
+                                                await adminProvider.removeMemberFromCommittee(uid: m.uid, isState: true);
+                                              }
+                                            },
+                                          ),
                                       ],
                                     ),
                                   ),
@@ -222,6 +255,14 @@ class _StateCommitteeScreenState extends State<StateCommitteeScreen> {
           ],
         ),
       ),
+      floatingActionButton: isAdmin
+          ? FloatingActionButton.extended(
+              backgroundColor: AppColors.brandPrimary,
+              icon: const Icon(Icons.person_add, color: Colors.white),
+              label: const Text('Add Member', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              onPressed: () => AddCommitteeMemberDialog.show(context, isState: true),
+            )
+          : null,
     );
   }
 }

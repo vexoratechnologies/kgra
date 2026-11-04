@@ -21,12 +21,18 @@ class UserModel {
   final String? reviewedByName;
   final String? reviewedById;
   final String? reviewedAt;
+  final List<String>? designations;
+  final String? stateCommitteeRole;
+  final String? executiveCommitteeRole;
 
   const UserModel({
     required this.uid,
     required this.name,
     required this.phoneNumber,
     this.designation,
+    this.designations,
+    this.stateCommitteeRole,
+    this.executiveCommitteeRole,
     this.institution,
     this.profileImageId,
     this.isApproved = false,
@@ -42,12 +48,36 @@ class UserModel {
     this.reviewedAt,
   });
 
+  /// Returns a normalized list of all unique designations the user holds,
+  /// taking both [designations] and comma-separated [designation] into account.
+  List<String> get allDesignations {
+    final list = <String>[];
+    if (designations != null && designations!.isNotEmpty) {
+      for (final d in designations!) {
+        final trimmed = d.trim();
+        if (trimmed.isNotEmpty && !list.any((x) => x.toLowerCase() == trimmed.toLowerCase())) {
+          list.add(trimmed);
+        }
+      }
+    }
+    if (designation != null && designation!.trim().isNotEmpty) {
+      for (final part in designation!.split(',')) {
+        final trimmed = part.trim();
+        if (trimmed.isNotEmpty && !list.any((x) => x.toLowerCase() == trimmed.toLowerCase())) {
+          list.add(trimmed);
+        }
+      }
+    }
+    return list;
+  }
+
   /// Creates a copy of the UserModel with replaced fields.
   UserModel copyWith({
     String? uid,
     String? name,
     String? phoneNumber,
     String? designation,
+    List<String>? designations,
     String? institution,
     String? profileImageId,
     bool? isApproved,
@@ -61,12 +91,19 @@ class UserModel {
     String? reviewedByName,
     String? reviewedById,
     String? reviewedAt,
+    String? stateCommitteeRole,
+    String? executiveCommitteeRole,
+    bool clearStateCommitteeRole = false,
+    bool clearExecutiveCommitteeRole = false,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
       name: name ?? this.name,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       designation: designation ?? this.designation,
+      designations: designations ?? this.designations,
+      stateCommitteeRole: clearStateCommitteeRole ? null : (stateCommitteeRole ?? this.stateCommitteeRole),
+      executiveCommitteeRole: clearExecutiveCommitteeRole ? null : (executiveCommitteeRole ?? this.executiveCommitteeRole),
       institution: institution ?? this.institution,
       profileImageId: profileImageId ?? this.profileImageId,
       isApproved: isApproved ?? this.isApproved,
@@ -103,11 +140,22 @@ class UserModel {
     final rawUid = json['uid']?.toString() ?? '';
     final effectiveUid = rawUid.isNotEmpty ? rawUid : (docId ?? '');
 
+    List<String>? parsedDesignations;
+    if (json['designations'] is List) {
+      parsedDesignations = (json['designations'] as List)
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+
     return UserModel(
       uid: effectiveUid,
       name: json['name'] as String? ?? '',
       phoneNumber: json['phoneNumber'] as String? ?? '',
       designation: json['designation'] as String?,
+      designations: parsedDesignations,
+      stateCommitteeRole: json['stateCommitteeRole'] as String?,
+      executiveCommitteeRole: json['executiveCommitteeRole'] as String?,
       institution: json['institution'] as String?,
       profileImageId: json['profileImageId'] as String?,
       isApproved: json['isApproved'] as bool? ?? false,
@@ -126,11 +174,19 @@ class UserModel {
 
   /// Converts the UserModel instance into a JSON map.
   Map<String, dynamic> toJson() {
+    final effectiveDesignations = designations ??
+        (designation != null && designation!.isNotEmpty
+            ? designation!.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
+            : null);
+
     return {
       'uid': uid,
       'name': name,
       'phoneNumber': phoneNumber,
       'designation': designation,
+      'designations': effectiveDesignations,
+      'stateCommitteeRole': stateCommitteeRole,
+      'executiveCommitteeRole': executiveCommitteeRole,
       'institution': institution,
       'profileImageId': profileImageId,
       'isApproved': isApproved,

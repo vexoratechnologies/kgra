@@ -29,6 +29,7 @@ import '../../features/auth/presentation/screens/super_admin_login_screen.dart';
 import '../../features/admin/presentation/screens/super_admin_dashboard.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/edit_profile_screen.dart';
+import '../../features/payment/presentation/screens/payment_screen.dart';
 import '../widgets/compact_app_bar.dart';
 
 /// AppRoutes defines all navigation routes and transition effects for the application.
@@ -275,7 +276,7 @@ class AppRoutes {
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           context: context,
           state: state,
-          child: const _PlaceholderScreen(title: 'Payments'),
+          child: const PaymentScreen(),
         ),
       ),
       GoRoute(

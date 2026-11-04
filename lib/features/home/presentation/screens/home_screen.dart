@@ -7,10 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/theme/app_text_style.dart';
-import '../../../../core/theme/app_radius.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/widgets/app_pdf_viewer_screen.dart';
 import '../../../ads/presentation/widgets/ad_carousel_widget.dart';
@@ -54,13 +50,23 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
+      final auth = context.read<AuthProvider>();
+      final isStillValid = await auth.verifyActiveSession();
+      if (!mounted) return;
+      if (!isStillValid) {
+        if (auth.isPendingApproval) {
+          context.go(AppRoutes.pending);
+        } else {
+          context.go(AppRoutes.login);
+        }
+        return;
+      }
       context.read<EventProvider>().fetchEvents();
       context.read<LiveSessionProvider>().fetchLiveSessions();
       context.read<UpdatesProvider>().fetchUpdates();
       context.read<GovernmentOrdersProvider>().fetchAllOrders();
-      final auth = context.read<AuthProvider>();
       final notif = context.read<NotificationProvider>();
       notif.setActiveUserId(auth.currentUser?.uid);
       notif.fetchNotifications();
@@ -137,16 +143,11 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
 
       _GridItem(
-        title: 'Membership',
-        icon: LucideIcons.userPlus,
+        title: 'Membership & Fees',
+        icon: LucideIcons.creditCard,
         iconColor: kSuccessColor,
         bgColor: kSuccessColor.withOpacity(0.08),
-        isComingSoon: true,
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Opening Membership Registration...')),
-          );
-        },
+        onTap: () => context.push(AppRoutes.payment),
       ),
       _GridItem(
         title: 'Beneficiary Scheme',

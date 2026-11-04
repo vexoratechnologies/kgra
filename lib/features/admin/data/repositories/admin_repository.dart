@@ -50,6 +50,11 @@ class AdminRepository {
     await _firestoreService.deleteUser(uid);
   }
 
+  /// Updates a user's details completely in Firestore.
+  Future<void> updateUser(UserModel user) async {
+    await _firestoreService.saveUser(user);
+  }
+
   // ==========================================
   // Admin & Zones Management
   // ==========================================

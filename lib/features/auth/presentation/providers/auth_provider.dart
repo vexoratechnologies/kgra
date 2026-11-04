@@ -137,19 +137,36 @@ class AuthProvider extends ChangeNotifier {
 
     // 2. Perform background fetch from remote database to check latest approval/details
     try {
-      final user = await _authRepository.getCurrentUser();
+      final phone = _currentUser?.phoneNumber ?? _authRepository.getCachedUser()?.phoneNumber;
+      final uid = _currentUser?.uid ?? _authRepository.getCachedUser()?.uid;
+
+      UserModel? user;
+      if (phone != null && phone.isNotEmpty) {
+        user = await _authRepository.getUserByPhone(phone);
+      }
+      if (user == null && uid != null && uid.isNotEmpty) {
+        user = await _authRepository.getUserByUid(uid);
+      }
+      user ??= await _authRepository.getCurrentUser();
+
       if (user != null) {
         _currentUser = user;
         _isRegistered = true;
         _isPendingApproval = !user.isApproved;
         _fetchCurrentUserImage();
       } else {
-        // Only clear cache and log out if there is actually NO active Firebase user session
-        if (FirebaseAuth.instance.currentUser == null) {
+        // User document no longer exists in Firestore (deleted by admin or unregistered).
+        if (_currentUser != null || FirebaseAuth.instance.currentUser != null) {
           _currentUser = null;
           _isRegistered = false;
           _isPendingApproval = false;
+          _currentUserPhotoBase64 = null;
           await _authRepository.clearUserCache();
+          try {
+            if (FirebaseAuth.instance.currentUser != null) {
+              await FirebaseAuth.instance.signOut();
+            }
+          } catch (_) {}
         }
       }
       notifyListeners();
@@ -161,6 +178,48 @@ class AuthProvider extends ChangeNotifier {
       }
     } finally {
       _setLoading(false);
+    }
+  }
+
+  /// Verifies whether the current user still exists and is approved in Firestore.
+  /// If deleted or non-existent, clears session, signs out, and returns false.
+  Future<bool> verifyActiveSession() async {
+    try {
+      final phone = _currentUser?.phoneNumber ?? _authRepository.getCachedUser()?.phoneNumber;
+      final uid = _currentUser?.uid ?? _authRepository.getCachedUser()?.uid;
+
+      UserModel? user;
+      if (phone != null && phone.isNotEmpty) {
+        user = await _authRepository.getUserByPhone(phone);
+      }
+      if (user == null && uid != null && uid.isNotEmpty) {
+        user = await _authRepository.getUserByUid(uid);
+      }
+      user ??= await _authRepository.getCurrentUser();
+
+      if (user == null) {
+        _currentUser = null;
+        _isRegistered = false;
+        _isPendingApproval = false;
+        _currentUserPhotoBase64 = null;
+        await _authRepository.clearUserCache();
+        try {
+          if (FirebaseAuth.instance.currentUser != null) {
+            await FirebaseAuth.instance.signOut();
+          }
+        } catch (_) {}
+        notifyListeners();
+        return false;
+      }
+      _currentUser = user;
+      _isRegistered = true;
+      _isPendingApproval = !user.isApproved;
+      await _authRepository.cacheUser(user);
+      notifyListeners();
+      return user.isApproved;
+    } catch (e) {
+      debugPrint('Error verifying active session: $e');
+      return _currentUser != null && !_isPendingApproval;
     }
   }
 

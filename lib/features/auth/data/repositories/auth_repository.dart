@@ -95,6 +95,16 @@ class AuthRepository {
     return await _firestoreService.getUserImage(profileImageId);
   }
 
+  /// Gets user details by phone number.
+  Future<UserModel?> getUserByPhone(String phoneNumber) async {
+    return await _firestoreService.getUserByPhoneNumber(phoneNumber);
+  }
+
+  /// Gets user details by UID.
+  Future<UserModel?> getUserByUid(String uid) async {
+    return await _firestoreService.getUserByUid(uid);
+  }
+
   /// Gets the currently authenticated user details.
   Future<UserModel?> getCurrentUser() async {
     final firebaseUser = _authService.currentUser;
@@ -103,12 +113,22 @@ class AuthRepository {
     }
     
     UserModel? user;
-    // Look up by verified phone number if available
-    if (firebaseUser.phoneNumber != null && firebaseUser.phoneNumber!.isNotEmpty) {
+    final cached = getCachedUser();
+
+    // 1. If we have a cached user, look up by their verified phone or UID
+    if (cached != null) {
+      if (cached.phoneNumber.isNotEmpty) {
+        user = await _firestoreService.getUserByPhoneNumber(cached.phoneNumber);
+      }
+      user ??= await _firestoreService.getUserByUid(cached.uid);
+    }
+    
+    // 2. Look up by verified phone number if available from Firebase Auth
+    if (user == null && firebaseUser.phoneNumber != null && firebaseUser.phoneNumber!.isNotEmpty) {
       user = await _firestoreService.getUserByPhoneNumber(firebaseUser.phoneNumber!);
     }
     
-    // Fallback to direct UID document lookup
+    // 3. Fallback to direct UID document lookup
     user ??= await _firestoreService.getUserByUid(firebaseUser.uid);
 
     if (user != null) {

@@ -31,6 +31,9 @@ import 'features/ads/data/repositories/ad_repository.dart';
 import 'features/ads/presentation/providers/ad_provider.dart';
 import 'features/events/data/repositories/event_repository.dart';
 import 'features/events/presentation/providers/event_provider.dart';
+import 'features/payment/data/firebase/payment_firebase_service.dart';
+import 'features/payment/data/repositories/payment_repository.dart';
+import 'features/payment/presentation/providers/payment_provider.dart';
 
 /// Global service locator instance.
 final GetIt locator = GetIt.instance;
@@ -52,6 +55,9 @@ Future<void> initInjection() async {
   );
   locator.registerLazySingleton<StorageService>(
     () => StorageService(),
+  );
+  locator.registerLazySingleton<PaymentFirebaseService>(
+    () => PaymentFirebaseService(),
   );
 
   // Repositories
@@ -133,6 +139,11 @@ Future<void> initInjection() async {
       storageService: locator<StorageService>(),
     ),
   );
+  locator.registerLazySingleton<PaymentRepository>(
+    () => PaymentRepository(
+      firebaseService: locator<PaymentFirebaseService>(),
+    ),
+  );
 
   // Providers (ChangeNotifiers must be factory or singleton, provider wraps creation)
   locator.registerFactory<AuthProvider>(
@@ -182,5 +193,8 @@ Future<void> initInjection() async {
   );
   locator.registerFactory<EventProvider>(
     () => EventProvider(repository: locator<EventRepository>()),
+  );
+  locator.registerFactory<PaymentProvider>(
+    () => PaymentProvider(repository: locator<PaymentRepository>()),
   );
 }

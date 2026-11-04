@@ -9,6 +9,8 @@ import '../../../admin/presentation/providers/admin_provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/widgets/compact_app_bar.dart';
+import '../../../../core/utils/committee_helper.dart';
+
 /// ZonalCommitteeScreen renders the list of zonal committee members for members.
 class ZonalCommitteeScreen extends StatefulWidget {
   const ZonalCommitteeScreen({super.key});
@@ -40,12 +42,8 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
   @override
   Widget build(BuildContext context) {
     final adminProvider = context.watch<AdminProvider>();
+    final allApproved = adminProvider.approvedUsers;
 
-    final zonalMembers = adminProvider.approvedUsers.where((m) {
-      final des = m.designation?.trim().toLowerCase() ?? '';
-      return des == 'zonal committee member';
-    }).toList();
-    
     bool isNonZonal(String z) {
       final l = z.trim().toLowerCase();
       return l.isEmpty ||
@@ -69,7 +67,7 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
         uniqueZones.putIfAbsent(z.trim().toLowerCase(), () => formatZoneName(z));
       }
     }
-    for (final m in zonalMembers) {
+    for (final m in allApproved) {
       final mZone = m.zone ?? '';
       if (!isNonZonal(mZone)) {
         uniqueZones.putIfAbsent(mZone.trim().toLowerCase(), () => formatZoneName(mZone));
@@ -80,15 +78,17 @@ class _ZonalCommitteeScreenState extends State<ZonalCommitteeScreen> {
     // Automatically select 'All' if not selected yet
     _selectedZone ??= 'All';
 
-    final filteredMembers = zonalMembers.where((m) {
-      final matchesZone = _selectedZone == 'All' ||
-          (m.zone?.trim().toLowerCase() == _selectedZone?.trim().toLowerCase());
-      final matchesQuery = m.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          (m.designation ?? '').toLowerCase().contains(_searchQuery.toLowerCase()) ||
+    final filteredMembers = CommitteeHelper.sortZonalMembers(allApproved.where((m) {
+      final matchesZone = CommitteeHelper.matchesZone(m.zone, _selectedZone);
+      final displayDes = m.designation ?? 'Member';
+      final matchesQuery = _searchQuery.isEmpty ||
+          m.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          displayDes.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           m.phoneNumber.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          (m.zone ?? '').toLowerCase().contains(_searchQuery.toLowerCase());
+          (m.zone ?? '').toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          (m.membershipId ?? '').toLowerCase().contains(_searchQuery.toLowerCase());
       return matchesZone && matchesQuery;
-    }).toList();
+    }).toList());
 
     return Scaffold(
       backgroundColor: AppColors.brandBackground,

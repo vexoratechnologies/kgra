@@ -40,6 +40,8 @@ import '../../../videos/data/models/video_model.dart';
 import '../../../videos/presentation/providers/video_provider.dart';
 import '../../../zonal/data/models/zonal_member_model.dart';
 import '../../../zonal/presentation/providers/zonal_provider.dart';
+import '../../../../core/utils/committee_helper.dart';
+import '../widgets/add_committee_member_dialog.dart';
 import '../providers/admin_provider.dart';
 
 /// SuperAdminDashboard renders the full-suite super administrative operations panel,
@@ -1619,9 +1621,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   Widget _buildStateCommitteeView(BuildContext context) {
     final adminProvider = context.watch<AdminProvider>();
     final stateMembers = adminProvider.approvedUsers.where((m) {
-      final des = m.designation?.trim().toLowerCase() ?? '';
-      return des == 'state committee member';
+      return CommitteeHelper.isStateCommitteeMember(m);
     }).toList();
+    final sortedMembers = CommitteeHelper.sortMembers(stateMembers, true);
 
     return Column(
       children: [
@@ -1634,20 +1636,30 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('State Committee Members (${stateMembers.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text('State Committee Members (${sortedMembers.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.person_add, size: 18),
+                label: const Text('Add Member'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brandPrimary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
+                onPressed: () => AddCommitteeMemberDialog.show(context, isState: true),
+              ),
             ],
           ),
         ),
         Expanded(
           child: adminProvider.isLoading
               ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
-              : stateMembers.isEmpty
+              : sortedMembers.isEmpty
                   ? const Center(child: Text('No State Committee members found.'))
                   : ListView.builder(
                       padding: const EdgeInsets.all(AppSpacing.lg),
-                      itemCount: stateMembers.length,
+                      itemCount: sortedMembers.length,
                       itemBuilder: (context, index) {
-                        final m = stateMembers[index];
+                        final m = sortedMembers[index];
                         if (m.profileImageId != null && m.profileImageId!.isNotEmpty && !adminProvider.userImages.containsKey(m.uid)) {
                           adminProvider.fetchUserImage(m.profileImageId!, m.uid);
                         }
@@ -1660,6 +1672,8 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                             imageProvider = MemoryImage(base64Decode(imgBase64));
                           } catch (_) {}
                         }
+
+                        final displayDes = CommitteeHelper.getDisplayDesignation(m, true);
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -1681,7 +1695,31 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                                   : null,
                             ),
                             title: Text(m.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text('${m.designation ?? "State Committee Member"} | Phone: ${m.phoneNumber} | Zone: ${m.zone ?? "N/A"} | ID: ${m.membershipId ?? "N/A"}'),
+                            subtitle: Text('$displayDes | Phone: ${m.phoneNumber} | Zone: ${m.zone ?? "N/A"} | ID: ${m.membershipId ?? "N/A"}'),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                              tooltip: 'Remove from State Committee',
+                              onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Remove from State Committee?'),
+                                    content: Text('Are you sure you want to remove ${m.name} ($displayDes) from the State Committee?'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+                                        onPressed: () => Navigator.pop(ctx, true),
+                                        child: const Text('Remove', style: TextStyle(color: Colors.white)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true && context.mounted) {
+                                  await adminProvider.removeMemberFromCommittee(uid: m.uid, isState: true);
+                                }
+                              },
+                            ),
                           ),
                         );
                       },
@@ -1812,24 +1850,37 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   Widget _buildZonalOrExecutiveCommitteeView(BuildContext context, {required bool isExecutive}) {
     final adminProv = context.watch<AdminProvider>();
     final allMembers = isExecutive
-        ? adminProv.approvedUsers.where((m) {
-            final des = m.designation?.trim().toLowerCase() ?? '';
-            return des == 'executive committee member' || des == 'executive commitee member';
-          }).toList()
-        : adminProv.approvedUsers.where((m) {
-            final des = m.designation?.trim().toLowerCase() ?? '';
-            return des == 'zonal committee member';
-          }).toList();
-    final zones = adminProv.zones;
+        ? CommitteeHelper.sortMembers(
+            adminProv.approvedUsers.where((m) => CommitteeHelper.isExecutiveCommitteeMember(m)).toList(),
+            false,
+          )
+        : CommitteeHelper.sortZonalMembers(adminProv.approvedUsers);
+
+    // Collect all valid zones from both adminProv.zones and users
+    bool isNonZonal(String z) {
+      final l = z.trim().toLowerCase();
+      return l.isEmpty || l == 'all' || l == 'state' || l.contains('executive');
+    }
+    final Map<String, String> uniqueZones = {};
+    for (final z in adminProv.zones) {
+      if (!isNonZonal(z)) uniqueZones[z.trim().toLowerCase()] = z.trim();
+    }
+    for (final m in adminProv.approvedUsers) {
+      final mZone = m.zone ?? '';
+      if (!isNonZonal(mZone)) uniqueZones[mZone.trim().toLowerCase()] = mZone.trim();
+    }
+    final zones = uniqueZones.values.toList()..sort();
 
     final filtered = allMembers.where((m) {
-      final matchesZone = _committeeZoneFilter == 'All' ||
-          (m.zone?.trim().toLowerCase() == _committeeZoneFilter.trim().toLowerCase());
+      final matchesZone = isExecutive || CommitteeHelper.matchesZone(m.zone, _committeeZoneFilter);
+      final displayDes = isExecutive ? CommitteeHelper.getDisplayDesignation(m, false) : (m.designation ?? 'Member');
       final matchesQuery = _committeeSearchQuery.isEmpty ||
           m.name.toLowerCase().contains(_committeeSearchQuery.toLowerCase()) ||
-          (m.designation ?? '').toLowerCase().contains(_committeeSearchQuery.toLowerCase()) ||
-          (m.zone ?? '').toLowerCase().contains(_committeeSearchQuery.toLowerCase());
-      return (isExecutive || matchesZone) && matchesQuery;
+          displayDes.toLowerCase().contains(_committeeSearchQuery.toLowerCase()) ||
+          m.phoneNumber.toLowerCase().contains(_committeeSearchQuery.toLowerCase()) ||
+          (m.zone ?? '').toLowerCase().contains(_committeeSearchQuery.toLowerCase()) ||
+          (m.membershipId ?? '').toLowerCase().contains(_committeeSearchQuery.toLowerCase());
+      return matchesZone && matchesQuery;
     }).toList();
 
     return Column(
@@ -1847,6 +1898,18 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const Spacer(),
+              if (isExecutive) ...[
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.person_add, size: 18),
+                  label: const Text('Add Member'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.brandPrimary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  ),
+                  onPressed: () => AddCommitteeMemberDialog.show(context, isState: false),
+                ),
+              ],
               if (!isExecutive) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1857,7 +1920,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
-                      value: _committeeZoneFilter,
+                      value: ['All', ...zones].contains(_committeeZoneFilter)
+                          ? _committeeZoneFilter
+                          : 'All',
                       style: const TextStyle(color: AppColors.brandSecondary, fontSize: 13, fontWeight: FontWeight.w600),
                       onChanged: (val) {
                         if (val != null) setState(() => _committeeZoneFilter = val);
@@ -1892,6 +1957,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                       } catch (_) {}
                     }
 
+                    final displayDes = isExecutive
+                        ? CommitteeHelper.getDisplayDesignation(m, false)
+                        : (m.designation ?? "Member");
+
                     return Container(
                       margin: const EdgeInsets.only(bottom: AppSpacing.md),
                       decoration: BoxDecoration(
@@ -1912,7 +1981,33 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                               : null,
                         ),
                         title: Text(m.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('${isExecutive ? "Executive Committee" : "Zone: ${m.zone ?? 'N/A'}"} | Designation: ${m.designation ?? "Member"} | Phone: ${m.phoneNumber} | ID: ${m.membershipId ?? "N/A"}'),
+                        subtitle: Text('${isExecutive ? "Executive Committee" : "Zone: ${m.zone ?? 'N/A'}"} | Designation: $displayDes | Phone: ${m.phoneNumber} | ID: ${m.membershipId ?? "N/A"}'),
+                        trailing: isExecutive
+                            ? IconButton(
+                                icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                                tooltip: 'Remove from Executive Committee',
+                                onPressed: () async {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('Remove from Executive Committee?'),
+                                      content: Text('Are you sure you want to remove ${m.name} ($displayDes) from the Executive Committee?'),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+                                          onPressed: () => Navigator.pop(ctx, true),
+                                          child: const Text('Remove', style: TextStyle(color: Colors.white)),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true && context.mounted) {
+                                    await adminProv.removeMemberFromCommittee(uid: m.uid, isState: false);
+                                  }
+                                },
+                              )
+                            : null,
                       ),
                     );
                   },

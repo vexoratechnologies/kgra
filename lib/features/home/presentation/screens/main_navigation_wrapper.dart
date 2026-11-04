@@ -15,6 +15,7 @@ import '../../../notification/presentation/screens/notifications_screen.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/widgets/compact_app_bar.dart';
+import '../../../../core/update/app_version_service.dart';
 import 'home_screen.dart';
 
 class MainNavigationWrapper extends StatefulWidget {
@@ -326,35 +327,30 @@ class _MenuScreen extends StatelessWidget {
           //     );
           //   },
           // ),
-          const SizedBox(height: AppSpacing.lg),
-
-          // Section 3: Support
-          // _buildMenuSectionTitle('SUPPORT'),
-          // _buildMenuItem(
-          //   icon: LucideIcons.helpCircle,
-          //   title: 'Help & FAQs',
-          //   subtitle: 'Frequently asked questions and guides',
-          //   iconColor: const Color(0xFF475569),
-          //   bgColor: const Color(0xFFF1F5F9),
-          //   onTap: () {
-          //     ScaffoldMessenger.of(context).showSnackBar(
-          //       const SnackBar(content: Text('Opening Help Desk FAQs...')),
-          //     );
-          //   },
-          // ),
-          // const SizedBox(height: AppSpacing.sm),
-          // _buildMenuItem(
-          //   icon: LucideIcons.mail,
-          //   title: 'Contact Secretariat',
-          //   subtitle: 'Support email and office address',
-          //   iconColor: const Color(0xFF475569),
-          //   bgColor: const Color(0xFFF1F5F9),
-          //   onTap: () {
-          //     ScaffoldMessenger.of(context).showSnackBar(
-          //       const SnackBar(content: Text('KGRA Headquarters, Trivandrum - secretary@kgra.org')),
-          //     );
-          //   },
-          // ),
+          const SizedBox(height: AppSpacing.xl),
+          Center(
+            child: Column(
+              children: [
+                Text(
+                  'Version ${AppVersionService.instance.currentVersionName} (Build ${AppVersionService.instance.currentBuildNumber})',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF94A3B8),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Kerala Govt Radiographers Association',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFFCBD5E1),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
         ],
       ),
     );
