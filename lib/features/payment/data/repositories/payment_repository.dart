@@ -243,4 +243,19 @@ class PaymentRepository {
   Stream<List<PaymentAttemptModel>> watchUserAttempts(String userId) {
     return _firebaseService.getUserAttempts(userId);
   }
+
+  /// Watch all verified payments (Admin)
+  Stream<List<PaymentTransactionModel>> watchAllPayments() {
+    return _firebaseService.getAllPaymentsStream();
+  }
+
+  /// Watch all payment attempts (Admin)
+  Stream<List<PaymentAttemptModel>> watchAllAttempts() {
+    return _firebaseService.getAllAttemptsStream();
+  }
+
+  /// Fetch all transactions (Admin)
+  Future<List<PaymentTransactionModel>> getAllTransactions() {
+    return _firebaseService.getAllTransactions();
+  }
 }

@@ -6,7 +6,7 @@ const { rtdb } = require('./firebase');
 const defaultConfig = {
   keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_TfREKwuczLH0HV',
   keySecret: process.env.RAZORPAY_KEY_SECRET || '6PRLktauO7P5CC0eO9q7EYlH',
-  amount: 1000.0,
+  amount: 1500.0,
   purpose: 'ANNUAL_MEMBERSHIP_FEE',
   title: 'Annual Membership',
   description: 'Standard annual association subscription for 12 months.',
@@ -123,9 +123,6 @@ if (rtdb) {
       }
       if (!data.RAZORPAY_KEY_SECRET && !data.razorpay_key_secret) {
         updates.RAZORPAY_KEY_SECRET = activeConfig.keySecret;
-      }
-      if (!data.ANNUAL_MEMBERSHIP_AMOUNT && !data.annual_membership_amount && !data.amount) {
-        updates.ANNUAL_MEMBERSHIP_AMOUNT = activeConfig.amount;
       }
       if (!data.MEMBERSHIP_TITLE && !data.title) {
         updates.MEMBERSHIP_TITLE = activeConfig.title;

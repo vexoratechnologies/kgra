@@ -8,6 +8,7 @@ import '../../../../core/widgets/app_pdf_viewer_screen.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/widgets/compact_app_bar.dart';
+import '../../../../core/utils/app_date_formatter.dart';
 import '../providers/meeting_minutes_provider.dart';
 import '../../../admin/presentation/providers/admin_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -294,7 +295,7 @@ class _MeetingMinutesScreenState extends State<MeetingMinutesScreen> {
                                     subtitle: Padding(
                                       padding: const EdgeInsets.only(top: 4.0),
                                       child: Text(
-                                        'Meeting Date: ${m.date}',
+                                        'Meeting Date: ${AppDateFormatter.formatToDateMonthYear(m.date)}',
                                         style: const TextStyle(fontSize: 12, color: Colors.grey),
                                       ),
                                     ),

@@ -69,6 +69,7 @@ class PaymentFirebaseService {
   }
 
   /// Update remote payment configuration in Realtime Database node '0' (and sync to Firestore)
+  /// Note: ANNUAL_MEMBERSHIP_AMOUNT is strictly fetch-only and is NEVER updated or overwritten here.
   Future<void> updatePaymentConfig(PaymentConfigModel config) async {
     try {
       await _realtimeDb.ref(rtdbRootNode).update({
@@ -79,22 +80,25 @@ class PaymentFirebaseService {
         'IS_PAYMENT_GLOBALLY_ENABLED': config.isPaymentGloballyEnabled,
         'RAZORPAY_KEY_ID': config.razorpayKeyId,
         'RAZORPAY_KEY_SECRET': config.razorpayKeySecret,
-        'ANNUAL_MEMBERSHIP_AMOUNT': config.annualMembershipAmount,
         'MEMBERSHIP_TITLE': config.membershipTitle,
         'MEMBERSHIP_DESCRIPTION': config.membershipDescription,
         'MEMBERSHIP_PURPOSE': config.membershipPurpose,
       });
 
+      final firestoreData = config.toMap();
+      firestoreData.remove('annualMembershipAmount');
+
       await _firestore
           .collection(configCollection)
           .doc(configDocId)
-          .set(config.toMap(), SetOptions(merge: true));
+          .set(firestoreData, SetOptions(merge: true));
     } catch (e) {
       debugPrint('[PaymentFirebaseService] Error updating config: $e');
     }
   }
 
-  /// Ensure initial RTDB keys & membership amount exist in node '0'
+  /// Ensure initial RTDB keys exist in node '0'
+  /// Note: ANNUAL_MEMBERSHIP_AMOUNT is fetch-only and is NEVER written or overwritten.
   Future<void> initializeDefaultConfigIfNeeded() async {
     try {
       final snapshot = await _realtimeDb.ref(rtdbRootNode).get();
@@ -102,7 +106,6 @@ class PaymentFirebaseService {
       if (!snapshot.exists || snapshot.value == null || snapshot.value is! Map) {
         updates['RAZORPAY_KEY_ID'] = 'rzp_test_TfREKwuczLH0HV';
         updates['RAZORPAY_KEY_SECRET'] = '6PRLktauO7P5CC0eO9q7EYlH';
-        updates['ANNUAL_MEMBERSHIP_AMOUNT'] = 1000.0;
         updates['MEMBERSHIP_TITLE'] = 'Annual Membership';
         updates['MEMBERSHIP_DESCRIPTION'] = 'Standard annual association subscription for 12 months.';
         updates['MEMBERSHIP_PURPOSE'] = 'ANNUAL_MEMBERSHIP_FEE';
@@ -113,12 +116,6 @@ class PaymentFirebaseService {
         }
         if (data['RAZORPAY_KEY_SECRET'] == null && data['razorpay_key_secret'] == null) {
           updates['RAZORPAY_KEY_SECRET'] = '6PRLktauO7P5CC0eO9q7EYlH';
-        }
-        if (data['ANNUAL_MEMBERSHIP_AMOUNT'] == null &&
-            data['annual_membership_amount'] == null &&
-            data['MEMBERSHIP_AMOUNT'] == null &&
-            data['amount'] == null) {
-          updates['ANNUAL_MEMBERSHIP_AMOUNT'] = 1000.0;
         }
         if (data['MEMBERSHIP_TITLE'] == null && data['membership_title'] == null) {
           updates['MEMBERSHIP_TITLE'] = 'Annual Membership';
@@ -132,7 +129,7 @@ class PaymentFirebaseService {
       }
       if (updates.isNotEmpty) {
         await _realtimeDb.ref(rtdbRootNode).update(updates);
-        debugPrint('[PaymentFirebaseService] Synced missing payment keys & amount to RTDB node 0: ${updates.keys}');
+        debugPrint('[PaymentFirebaseService] Synced missing payment keys to RTDB node 0: ${updates.keys}');
       }
     } catch (e) {
       debugPrint('[PaymentFirebaseService] RTDB default config initialization notice: $e');
@@ -225,5 +222,102 @@ class PaymentFirebaseService {
           .map((doc) => PaymentAttemptModel.fromMap(doc.data(), doc.id))
           .toList();
     });
+  }
+
+  /// Stream all payments from PAYMENTS collection
+  Stream<List<PaymentTransactionModel>> getAllPaymentsStream() {
+    return _firestore
+        .collection(paymentsCollection)
+        .snapshots()
+        .map((snapshot) {
+      final list = snapshot.docs
+          .map((doc) => PaymentTransactionModel.fromMap(doc.data(), doc.id))
+          .toList();
+      list.sort((a, b) {
+        final aDate = a.paidAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bDate = b.paidAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return bDate.compareTo(aDate);
+      });
+      return list;
+    });
+  }
+
+  /// Stream all attempts from PAYMENT_ATTEMPTS collection
+  Stream<List<PaymentAttemptModel>> getAllAttemptsStream() {
+    return _firestore
+        .collection(attemptsCollection)
+        .snapshots()
+        .map((snapshot) {
+      final list = snapshot.docs
+          .map((doc) => PaymentAttemptModel.fromMap(doc.data(), doc.id))
+          .toList();
+      list.sort((a, b) {
+        final aDate = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bDate = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return bDate.compareTo(aDate);
+      });
+      return list;
+    });
+  }
+
+  /// Fetch all unified transactions (verified payments and any distinct attempts)
+  Future<List<PaymentTransactionModel>> getAllTransactions() async {
+    final Map<String, PaymentTransactionModel> transactions = {};
+
+    // 1. Fetch completed payments
+    try {
+      final paymentsSnapshot = await _firestore.collection(paymentsCollection).get();
+      for (final doc in paymentsSnapshot.docs) {
+        final payment = PaymentTransactionModel.fromMap(doc.data(), doc.id);
+        final key = payment.orderId.isNotEmpty ? payment.orderId : payment.paymentId;
+        transactions[key] = payment;
+      }
+    } catch (e) {
+      debugPrint('[PaymentFirebaseService] Error fetching PAYMENTS: $e');
+    }
+
+    // 2. Fetch attempts for any initiated/failed/cancelled
+    try {
+      final attemptsSnapshot = await _firestore.collection(attemptsCollection).get();
+      for (final doc in attemptsSnapshot.docs) {
+        final attempt = PaymentAttemptModel.fromMap(doc.data(), doc.id);
+        final key = attempt.orderId.isNotEmpty ? attempt.orderId : attempt.attemptId;
+        if (!transactions.containsKey(key)) {
+          transactions[key] = PaymentTransactionModel(
+            paymentId: attempt.paymentId ?? attempt.attemptId,
+            orderId: attempt.orderId,
+            receiptNumber: attempt.receiptNumber ?? attempt.receipt,
+            attemptId: attempt.attemptId,
+            userId: attempt.userId,
+            userName: attempt.userName,
+            userPhone: attempt.userPhone,
+            userEmail: attempt.userEmail,
+            membershipId: attempt.membershipId,
+            designation: attempt.designation,
+            institution: attempt.institution,
+            zone: attempt.zone,
+            amount: attempt.amount,
+            currency: attempt.currency,
+            status: attempt.status,
+            purpose: attempt.purpose,
+            financialYear: attempt.financialYear,
+            paymentMethod: attempt.paymentMethod,
+            platform: attempt.platform,
+            paidAt: attempt.createdAt,
+            verifiedAt: attempt.updatedAt,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[PaymentFirebaseService] Error fetching PAYMENT_ATTEMPTS: $e');
+    }
+
+    final list = transactions.values.toList();
+    list.sort((a, b) {
+      final aDate = a.paidAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bDate = b.paidAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bDate.compareTo(aDate);
+    });
+    return list;
   }
 }

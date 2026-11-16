@@ -36,20 +36,20 @@ class AppVersionService {
   /// Cached package information
   PackageInfo? get packageInfo => _packageInfo;
 
-  /// Current build number extracted from app metadata (e.g. '16' from 1.0.8+16)
+  /// Current build number extracted from app metadata (e.g. '17' from 1.0.9+17)
   String get currentBuildNumber {
     if (_packageInfo == null) {
       init();
     }
-    return _packageInfo?.buildNumber ?? '16';
+    return _packageInfo?.buildNumber ?? '17';
   }
 
-  /// Current version name (e.g. '1.0.8')
+  /// Current version name (e.g. '1.0.9')
   String get currentVersionName {
     if (_packageInfo == null) {
       init();
     }
-    return _packageInfo?.version ?? '1.0.8';
+    return _packageInfo?.version ?? '1.0.9';
   }
 
   /// Whether the app is currently force-locked
@@ -71,6 +71,12 @@ class AppVersionService {
     String? databaseUrl,
     String? moduleKey,
   }) {
+    if (kIsWeb) {
+      debugPrint('[AppVersionService] Force update listener skipped on web.');
+      updateConfigNotifier.value = null;
+      return;
+    }
+
     _versionSubscription?.cancel();
 
     final String dbUrl = databaseUrl ?? defaultDatabaseUrl;
@@ -109,13 +115,25 @@ class AppVersionService {
         final String versionKey = moduleKey ?? (isIosPlatform ? 'ALLOWED_VERSIONS_IOS' : 'ALLOWED_VERSIONS');
         final String addressKey = isIosPlatform ? 'ADDRESS_iOS' : 'ADDRESS';
 
-        final dynamic rawAllowed = config[versionKey] ?? config['ALLOWED_VERSIONS'];
+        final dynamic rawAllowed = config[versionKey] ??
+            (isIosPlatform
+                ? (config['ALLOWED_VERSIONS_IOS'] ?? config['ALLOWED_VERSIONS_ios'] ?? config['ALLOWED_VERSIONS_Ios'])
+                : null) ??
+            config['ALLOWED_VERSIONS'];
         final String allowedStr = rawAllowed?.toString() ?? '';
 
         final String text = config['TEXT']?.toString() ??
             'A new version of My KGRA is available. Please update to continue.';
         final String buttonText = config['BUTTON']?.toString() ?? 'UPDATE NOW';
-        final String address = config[addressKey]?.toString() ?? config['ADDRESS']?.toString() ?? '';
+
+        final dynamic rawAddress = isIosPlatform
+            ? (config['ADDRESS_iOS'] ??
+                config['ADDRESS_IOS'] ??
+                config['ADDRESS_ios'] ??
+                config['ADDRESS_Ios'] ??
+                config['ADDRESS'])
+            : (config[addressKey] ?? config['ADDRESS']);
+        final String address = rawAddress?.toString() ?? '';
 
         _evaluateVersion(
           allowedVersionsStr: allowedStr,
@@ -137,6 +155,10 @@ class AppVersionService {
     required String buttonText,
     required String address,
   }) {
+    if (kIsWeb) {
+      updateConfigNotifier.value = null;
+      return;
+    }
     // Split comma-separated allowed build numbers/versions
     final List<String> allowedList = allowedVersionsStr
         .split(',')

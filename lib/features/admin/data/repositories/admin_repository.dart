@@ -55,6 +55,11 @@ class AdminRepository {
     await _firestoreService.saveUser(user);
   }
 
+  /// Saves or updates a user profile image document in Firestore.
+  Future<void> saveUserImage(String profileImageId, String imageBase64) async {
+    await _firestoreService.saveUserImage(profileImageId, imageBase64);
+  }
+
   // ==========================================
   // Admin & Zones Management
   // ==========================================

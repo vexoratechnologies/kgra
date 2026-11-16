@@ -31,7 +31,7 @@ class ProfileScreen extends StatelessWidget {
         : 'Normal';
     final institution = (user?.institution != null && user!.institution!.isNotEmpty)
         ? user.institution!
-        : 'Medical';
+        : 'Not Provided';
     final membershipId = (user?.membershipId != null && user!.membershipId!.isNotEmpty)
         ? user.membershipId!
         : 'KGRA-2026-MEMBER';

@@ -398,6 +398,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         
                         const SizedBox(height: AppSpacing.lg),
 
+                        // Institution Label & Input
+                        Text(
+                          'Institution',
+                          style: AppTextStyle.labelMd(color: AppColors.brandSecondary).copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        TextFormField(
+                          controller: _institutionController,
+                          keyboardType: TextInputType.text,
+                          decoration: const InputDecoration(
+                            hintText: 'Enter your institution',
+                            prefixIcon: Icon(Icons.business_outlined),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Institution is required';
+                            }
+                            return null;
+                          },
+                        ),
+
+                        const SizedBox(height: AppSpacing.lg),
+
                         // Zone Dropdown Selection
                         Text(
                           'Zone',

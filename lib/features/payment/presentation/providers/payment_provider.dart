@@ -263,6 +263,26 @@ class PaymentProvider extends ChangeNotifier {
     debugPrint('[PaymentProvider] External wallet selected: ${response.walletName}');
   }
 
+  List<PaymentTransactionModel> _allTransactions = [];
+  bool _isLoadingTransactions = false;
+
+  List<PaymentTransactionModel> get allTransactions => _allTransactions;
+  bool get isLoadingTransactions => _isLoadingTransactions;
+
+  /// Fetch all transactions for Super Admin operations
+  Future<void> fetchAllTransactions() async {
+    _isLoadingTransactions = true;
+    notifyListeners();
+    try {
+      _allTransactions = await _repository.getAllTransactions();
+    } catch (e) {
+      debugPrint('[PaymentProvider] fetchAllTransactions notice: $e');
+    } finally {
+      _isLoadingTransactions = false;
+      notifyListeners();
+    }
+  }
+
   /// Watch user's verified payments
   Stream<List<PaymentTransactionModel>> watchUserPayments(String userId) {
     return _repository.watchUserPayments(userId);
@@ -271,6 +291,16 @@ class PaymentProvider extends ChangeNotifier {
   /// Watch user's payment attempts
   Stream<List<PaymentAttemptModel>> watchUserAttempts(String userId) {
     return _repository.watchUserAttempts(userId);
+  }
+
+  /// Watch all verified payments (Admin)
+  Stream<List<PaymentTransactionModel>> watchAllPayments() {
+    return _repository.watchAllPayments();
+  }
+
+  /// Watch all payment attempts (Admin)
+  Stream<List<PaymentAttemptModel>> watchAllAttempts() {
+    return _repository.watchAllAttempts();
   }
 
   /// Toggle config remotely (Admin)

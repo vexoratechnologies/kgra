@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/widgets/compact_app_bar.dart';
+import '../../../../core/utils/app_date_formatter.dart';
 import '../providers/forms_circulars_provider.dart';
 
 class FormsCircularsScreen extends StatefulWidget {
@@ -138,7 +139,7 @@ class _FormsCircularsScreenState extends State<FormsCircularsScreen> {
                                     subtitle: Padding(
                                       padding: const EdgeInsets.only(top: 4.0),
                                       child: Text(
-                                        'Circular No: ${f.circularNumber ?? "N/A"} | Date: ${f.date}',
+                                        'Circular No: ${f.circularNumber ?? "N/A"} | Date: ${AppDateFormatter.formatToDateMonthYear(f.date)}',
                                         style: const TextStyle(fontSize: 12, color: Colors.grey),
                                       ),
                                     ),

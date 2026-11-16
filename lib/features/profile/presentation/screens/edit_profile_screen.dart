@@ -456,9 +456,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     TextFormField(
                       controller: _institutionController,
                       decoration: const InputDecoration(
-                        hintText: 'Enter Institution/Hospital',
+                        hintText: 'Enter Institution',
                         prefixIcon: Icon(Icons.business_outlined),
                       ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Institution is required';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: AppSpacing.lg),
 

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My KGRA - Simple Overview</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 12mm 15mm;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 13.5px;
+      line-height: 1.5;
+      color: #1e293b;
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f8fafc;
+    }
+    .sheet {
+      background: #ffffff;
+      padding: 30px 34px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+    }
+    .header {
+      background: #0f4c81;
+      color: #ffffff;
+      padding: 18px 22px;
+      border-radius: 6px;
+      border-top: 4px solid #d97706;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .header p {
+      font-size: 12.5px;
+      color: #e0f2fe;
+      margin-top: 2px;
+    }
+    .header-badge {
+      background: #d97706;
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 5px 12px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    .section-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #0f4c81;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-title::before {
+      content: "";
+      display: inline-block;
+      width: 4px;
+      height: 15px;
+      background: #0f4c81;
+      border-radius: 2px;
+    }
+    p {
+      font-size: 13px;
+      color: #334155;
+      line-height: 1.55;
+    }
+    ul {
+      margin-left: 20px;
+    }
+    li {
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: #334155;
+      line-height: 1.5;
+    }
+    li strong {
+      color: #0f172a;
+    }
+    .feature-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .feature-item {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-left: 4px solid #0f4c81;
+      border-radius: 5px;
+      padding: 9px 14px;
+    }
+    .feature-item h4 {
+      font-size: 13px;
+      color: #0f4c81;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+    .feature-item p {
+      font-size: 12px;
+      color: #475569;
+      line-height: 1.45;
+      margin-bottom: 0;
+    }
+    .print-bar {
+      background: #e0f2fe;
+      border: 1px dashed #0284c7;
+      padding: 8px 14px;
+      border-radius: 6px;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: #0369a1;
+    }
+    .print-btn {
+      background: #0284c7;
+      color: #fff;
+      border: none;
+      padding: 5px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 12px;
+    }
+    @media print {
+      body {
+        background: #fff;
+        padding: 0;
+      }
+      .sheet {
+        border: none;
+        box-shadow: none;
+        padding: 0;
+      }
+      .print-bar {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="print-bar">
+    <span><strong>Simple Marketing One-Pager:</strong> Press <strong>Cmd + P</strong> to print or export as PDF.</span>
+    <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+  </div>
+
+  <div class="sheet">
+
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>MY KGRA</h1>
+        <p>Official Mobile Application &bull; Kerala Government Radiographers' Association</p>
+      </div>
+      <div class="header-badge">App Overview</div>
+    </div>
+
+    <!-- What is My KGRA -->
+    <div class="section">
+      <div class="section-title">What is My KGRA?</div>
+      <p>
+        <strong>My KGRA</strong> is the official mobile application for government hospital radiographers across Kerala. It is a simple, secure digital platform that gives members instant access to official association news, Government Orders, educational webinars, and digital membership services directly from their smartphones.
+      </p>
+    </div>
+
+    <!-- Who is it for -->
+    <div class="section">
+      <div class="section-title">Who is it for?</div>
+      <ul>
+        <li><strong>Government Hospital Radiographers:</strong> Radiographers and technologists working in Medical Colleges and Hospitals (DHS &amp; DME).</li>
+        <li><strong>Association Leaders:</strong> State Committee, Executive Council, and Zonal committee representatives.</li>
+        <li><strong>New Recruits &amp; Retired Members:</strong> Fresh joinees seeking guidance and senior retired members staying connected.</li>
+      </ul>
+    </div>
+
+    <!-- What Members Can Do -->
+    <div class="section">
+      <div class="section-title">What Members Can Do (Key Features)</div>
+      <div class="feature-list">
+        <div class="feature-item">
+          <h4>👥 State Committee Leadership Directory</h4>
+          <p>View official State Committee leaders in ranked hierarchy (President, General Secretary, Treasurer, etc.) with direct phone contacts and live search.</p>
+        </div>
+        <div class="feature-item">
+          <h4>📍 Executive &amp; Zonal Committees</h4>
+          <p>Access designated Executive Council delegates and regional zonal committees across all 14 districts in Kerala.</p>
+        </div>
+        <div class="feature-item">
+          <h4>📢 Instant Announcements</h4>
+          <p>Real-time push alerts for official association news, press releases, and circulars.</p>
+        </div>
+        <div class="feature-item">
+          <h4>📄 Government Orders (G.O.) &amp; Circulars</h4>
+          <p>Read and download official Health Department orders, service guidelines, and meeting minutes with built-in PDF viewing.</p>
+        </div>
+        <div class="feature-item">
+          <h4>💳 Easy Online Payments</h4>
+          <p>Pay annual membership dues and welfare funds quickly and securely via UPI, cards, or net banking.</p>
+        </div>
+        <div class="feature-item">
+          <h4>🎓 Webinars &amp; Training (CME)</h4>
+          <p>Watch medical imaging tutorials, clinical lectures, and live CME webinars directly within the app.</p>
+        </div>
+        <div class="feature-item">
+          <h4>🪪 Digital Membership Profile</h4>
+          <p>Instant digital verification of your active membership status, professional designation, and assigned zone.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>

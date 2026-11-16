@@ -41,7 +41,11 @@ import '../../../videos/presentation/providers/video_provider.dart';
 import '../../../zonal/data/models/zonal_member_model.dart';
 import '../../../zonal/presentation/providers/zonal_provider.dart';
 import '../../../../core/utils/committee_helper.dart';
+import '../../../../core/utils/excel_export_service.dart';
+import '../../../payment/data/models/payment_model.dart';
+import '../../../payment/presentation/providers/payment_provider.dart';
 import '../widgets/add_committee_member_dialog.dart';
+import '../widgets/edit_member_dialog.dart';
 import '../providers/admin_provider.dart';
 
 /// SuperAdminDashboard renders the full-suite super administrative operations panel,
@@ -78,6 +82,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   String _committeeSearchQuery = '';
   String? _expandedUserUid;
 
+  // Payment Search & Filter States
+  final _paymentSearchController = TextEditingController();
+  String _paymentSearchQuery = '';
+  String _paymentStatusFilter = 'All Statuses';
+  String _paymentZoneFilter = 'All Zones';
+  bool _isExporting = false;
+
   // Mock Settings States
   String _clearanceLevel = 'Superadmin';
 
@@ -107,6 +118,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     _designationNameController.dispose();
     _userSearchController.dispose();
     _committeeSearchController.dispose();
+    _paymentSearchController.dispose();
     super.dispose();
   }
 
@@ -131,6 +143,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     context.read<VideoProvider>().fetchVideos();
     context.read<EventProvider>().fetchEvents();
     context.read<AdProvider>().fetchAds(force: true);
+    context.read<PaymentProvider>().fetchAllTransactions();
   }
 
   void _onTabChanged(String label) {
@@ -145,15 +158,21 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       adminProv.fetchApprovedUsers();
     } else if (label == 'Rejected Requests') {
       adminProv.fetchRejectedUsers();
+    } else if (label == 'Payment Details' || label == 'Payments') {
+      context.read<PaymentProvider>().fetchAllTransactions();
     } else if (label == 'Zonal Admins') {
       adminProv.fetchAdmins();
     } else if (label == 'Zones') {
       adminProv.fetchZones();
     } else if (label == 'Designations') {
       adminProv.fetchDesignations();
-    } else if (label == 'State Committee' || label == 'State Committee Members') {
+    } else if (label == 'State Committee' ||
+        label == 'State Committee Members') {
       adminProv.fetchApprovedUsers();
-    } else if (label == 'Executive Committee' || label == 'Executive Committee Members' || label == 'Zonal Committee' || label == 'Zonal Committee Members') {
+    } else if (label == 'Executive Committee' ||
+        label == 'Executive Committee Members' ||
+        label == 'Zonal Committee' ||
+        label == 'Zonal Committee Members') {
       adminProv.fetchApprovedUsers();
       adminProv.fetchZones();
     } else if (label == 'Meeting Minutes' || label == 'Minutes Approvals') {
@@ -185,7 +204,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     if (!_adminFormKey.currentState!.validate()) return;
     if (_selectedAdminZone == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a zone'), backgroundColor: AppColors.error),
+        const SnackBar(
+          content: Text('Please select a zone'),
+          backgroundColor: AppColors.error,
+        ),
       );
       return;
     }
@@ -204,7 +226,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       _adminPasswordController.clear();
       setState(() => _selectedAdminZone = null);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Zonal admin created successfully'), backgroundColor: Colors.green),
+        const SnackBar(
+          content: Text('Zonal admin created successfully'),
+          backgroundColor: Colors.green,
+        ),
       );
     }
   }
@@ -217,7 +242,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     if (success && mounted) {
       _zoneNameController.clear();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Zone added successfully'), backgroundColor: Colors.green),
+        const SnackBar(
+          content: Text('Zone added successfully'),
+          backgroundColor: Colors.green,
+        ),
       );
     }
   }
@@ -230,7 +258,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     if (success && mounted) {
       _designationNameController.clear();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Designation added successfully'), backgroundColor: Colors.green),
+        const SnackBar(
+          content: Text('Designation added successfully'),
+          backgroundColor: Colors.green,
+        ),
       );
     }
   }
@@ -246,16 +277,28 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
     final currentAdmin = adminProvider.currentAdmin;
     if (currentAdmin == null || currentAdmin.role != 'super_admin') {
-      return const Scaffold(body: Center(child: CircularProgressIndicator(color: AppColors.brandPrimary)));
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.brandPrimary),
+        ),
+      );
     }
 
     return Scaffold(
       key: _scaffoldKey,
-      drawer: isDesktop ? null : Drawer(child: _buildSidebarContent(isMobile: true)),
+      drawer: isDesktop
+          ? null
+          : Drawer(child: _buildSidebarContent(isMobile: true)),
       appBar: isDesktop
           ? null
           : AppBar(
-              title: Text(_activeTab, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              title: Text(
+                _activeTab,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
               backgroundColor: AppColors.surfaceContainerLowest,
               elevation: 1,
               leading: IconButton(
@@ -269,7 +312,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 ),
               ],
             ),
-      backgroundColor: isDesktop ? AppColors.surfaceContainerLow : AppColors.brandBackground,
+      backgroundColor: isDesktop
+          ? AppColors.surfaceContainerLow
+          : AppColors.brandBackground,
       body: SafeArea(
         child: Row(
           children: [
@@ -325,7 +370,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
   Widget _buildHeaderFrame(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xl,
+        vertical: 12,
+      ),
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(20),
@@ -342,18 +390,23 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         children: [
           Text(
             _activeTab,
-            style: AppTextStyle.headlineLg(color: AppColors.brandSecondary).copyWith(
-              fontWeight: FontWeight.w800,
-            ),
+            style: AppTextStyle.headlineLg(
+              color: AppColors.brandSecondary,
+            ).copyWith(fontWeight: FontWeight.w800),
           ),
           Row(
             children: [
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.brandPrimary.withValues(alpha: 0.08),
+                  backgroundColor: AppColors.brandPrimary.withValues(
+                    alpha: 0.08,
+                  ),
                   foregroundColor: AppColors.brandPrimary,
                   elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: 10,
+                  ),
                 ),
                 onPressed: _refreshData,
                 icon: const Icon(Icons.refresh, size: 18),
@@ -374,10 +427,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 children: [
                   Text(
                     'Super Admin',
-                    style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
+                    style: AppTextStyle.titleLg(
+                      color: AppColors.brandSecondary,
+                    ).copyWith(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                   const Text(
                     'Root Administrator',
@@ -396,7 +448,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     final adminProv = context.watch<AdminProvider>();
     final minutesProv = context.watch<MeetingMinutesProvider>();
     final pendingUsers = adminProv.pendingUsers.length;
-    final pendingMinutes = minutesProv.minutesList.where((m) => m.status == 'pending').length;
+    final pendingMinutes = minutesProv.minutesList
+        .where((m) => m.status == 'pending')
+        .length;
 
     return Container(
       width: isMobile ? 280 : 250,
@@ -414,7 +468,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         children: [
           // Logo / Header
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.xl,
+            ),
             decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(
@@ -451,10 +508,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   children: [
                     Text(
                       'MY KGRA',
-                      style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
-                      ),
+                      style:
+                          AppTextStyle.titleLg(
+                            color: AppColors.brandSecondary,
+                          ).copyWith(
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          ),
                     ),
                     const Text(
                       'Super Admin Portal',
@@ -480,33 +540,66 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 _buildSidebarSectionHeader('CORE & MEMBERS'),
                 _buildSidebarItem('Dashboard', Icons.dashboard_outlined),
                 _buildSidebarItem('All Members', Icons.groups_outlined),
-                _buildSidebarItem('Pending Approvals', Icons.hourglass_top_outlined, badgeCount: pendingUsers > 0 ? pendingUsers : null),
-                _buildSidebarItem('Approved Members', Icons.verified_user_outlined),
+                _buildSidebarItem(
+                  'Pending Approvals',
+                  Icons.hourglass_top_outlined,
+                  badgeCount: pendingUsers > 0 ? pendingUsers : null,
+                ),
+                _buildSidebarItem(
+                  'Approved Members',
+                  Icons.verified_user_outlined,
+                ),
                 _buildSidebarItem('Rejected Requests', Icons.cancel_outlined),
+                _buildSidebarItem('Payment Details', Icons.payments_outlined),
 
                 const SizedBox(height: 12),
                 _buildSidebarSectionHeader('MASTER GOVERNANCE'),
-                _buildSidebarItem('Zonal Admins', Icons.admin_panel_settings_outlined),
+                _buildSidebarItem(
+                  'Zonal Admins',
+                  Icons.admin_panel_settings_outlined,
+                ),
                 _buildSidebarItem('Zones', Icons.map_outlined),
                 _buildSidebarItem('Designations', Icons.badge_outlined),
                 _buildSidebarItem('Ads Carousel', Icons.view_carousel_outlined),
 
                 const SizedBox(height: 12),
                 _buildSidebarSectionHeader('LEADERSHIP COMMITTEES'),
-                _buildSidebarItem('State Committee Members', Icons.account_balance_outlined),
-                _buildSidebarItem('Executive Committee Members', Icons.stars_outlined),
-                _buildSidebarItem('Zonal Committee Members', Icons.group_work_outlined),
+                _buildSidebarItem(
+                  'State Committee Members',
+                  Icons.account_balance_outlined,
+                ),
+                _buildSidebarItem(
+                  'Executive Committee Members',
+                  Icons.stars_outlined,
+                ),
+                _buildSidebarItem(
+                  'Zonal Committee Members',
+                  Icons.group_work_outlined,
+                ),
 
                 const SizedBox(height: 12),
                 _buildSidebarSectionHeader('MEDIA & DOCUMENTS'),
-                _buildSidebarItem('Meeting Minutes', Icons.description_outlined),
-                _buildSidebarItem('Minutes Approvals', Icons.approval_outlined, badgeCount: pendingMinutes > 0 ? pendingMinutes : null),
+                _buildSidebarItem(
+                  'Meeting Minutes',
+                  Icons.description_outlined,
+                ),
+                _buildSidebarItem(
+                  'Minutes Approvals',
+                  Icons.approval_outlined,
+                  badgeCount: pendingMinutes > 0 ? pendingMinutes : null,
+                ),
                 _buildSidebarItem('Government Orders', Icons.gavel_outlined),
-                _buildSidebarItem('Forms & Circulars', Icons.folder_zip_outlined),
+                _buildSidebarItem(
+                  'Forms & Circulars',
+                  Icons.folder_zip_outlined,
+                ),
                 _buildSidebarItem('Updates', Icons.campaign_outlined),
                 _buildSidebarItem('Live Sessions', Icons.live_tv_outlined),
                 _buildSidebarItem('Gallery', Icons.photo_library_outlined),
-                _buildSidebarItem('Educational Videos', Icons.video_library_outlined),
+                _buildSidebarItem(
+                  'Educational Videos',
+                  Icons.video_library_outlined,
+                ),
                 _buildSidebarItem('Upcoming Events', Icons.event_outlined),
 
                 const SizedBox(height: 12),
@@ -523,7 +616,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             child: OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size.fromHeight(45),
-                side: BorderSide(color: AppColors.brandSecondary.withValues(alpha: 0.15)),
+                side: BorderSide(
+                  color: AppColors.brandSecondary.withValues(alpha: 0.15),
+                ),
                 foregroundColor: AppColors.brandSecondary,
                 shape: RoundedRectangleBorder(borderRadius: AppRadius.borderMd),
               ),
@@ -579,14 +674,18 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.brandPrimary.withValues(alpha: 0.08) : Colors.transparent,
+                color: isSelected
+                    ? AppColors.brandPrimary.withValues(alpha: 0.08)
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
                   Icon(
                     icon,
-                    color: isSelected ? const Color(0xFF8B1E2D) : const Color(0xFF64748B),
+                    color: isSelected
+                        ? const Color(0xFF8B1E2D)
+                        : const Color(0xFF64748B),
                     size: 18,
                   ),
                   const SizedBox(width: 10),
@@ -595,17 +694,28 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                       label,
                       style: TextStyle(
                         fontFamily: 'Manrope',
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                        color: isSelected ? const Color(0xFF8B1E2D) : const Color(0xFF64748B),
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                        color: isSelected
+                            ? const Color(0xFF8B1E2D)
+                            : const Color(0xFF64748B),
                         fontSize: 13,
                       ),
                     ),
                   ),
                   if (badgeCount != null)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
-                        color: label == 'Pending Approvals' || label == 'Minutes Approvals' ? AppColors.error : AppColors.brandPrimary,
+                        color:
+                            label == 'Pending Approvals' ||
+                                label == 'Minutes Approvals'
+                            ? AppColors.error
+                            : AppColors.brandPrimary,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
@@ -655,6 +765,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         return _buildSuperAdminUsersView(context, 'approved', adminProvider);
       case 'Rejected Requests':
         return _buildSuperAdminUsersView(context, 'rejected', adminProvider);
+      case 'Payment Details':
+      case 'Payments':
+        return _buildPaymentDetailsView(context);
       case 'Zonal Admins':
         return _buildZonalAdminsView(adminProvider);
       case 'Zones':
@@ -702,12 +815,21 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   // ==========================================
 
   Widget _buildDashboardView(AdminProvider adminProvider) {
+    final paymentProv = context.watch<PaymentProvider>();
     final pendingNum = adminProvider.pendingUsers.length;
     final approvedNum = adminProvider.approvedUsers.length;
     final rejectedNum = adminProvider.rejectedUsers.length;
     final totalNum = pendingNum + approvedNum + rejectedNum;
     final zonalAdminsCount = adminProvider.admins.length;
     final zonesCount = adminProvider.zones.length;
+
+    final successfulPayments = paymentProv.allTransactions
+        .where((p) => p.status.toUpperCase() == 'SUCCESS')
+        .toList();
+    final totalCollections = successfulPayments.fold<double>(
+      0.0,
+      (sum, p) => sum + p.amount,
+    );
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -716,10 +838,15 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         children: [
           Text(
             'Master Overview',
-            style: AppTextStyle.headlineSm(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold),
+            style: AppTextStyle.headlineSm(
+              color: AppColors.brandSecondary,
+            ).copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
-          const Text('Real-time statistics across all zones and administrative modules.', style: TextStyle(color: Colors.grey, fontSize: 13)),
+          const Text(
+            'Real-time statistics across all zones and administrative modules.',
+            style: TextStyle(color: Colors.grey, fontSize: 13),
+          ),
           const SizedBox(height: AppSpacing.xl),
 
           // KPI Cards Grid
@@ -769,6 +896,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 color: Colors.teal,
                 subtitle: 'Territorial jurisdictions',
               ),
+              _buildStatCard(
+                title: 'Total Collections',
+                value: '₹${NumberFormat('#,##,###').format(totalCollections)}',
+                icon: Icons.payments,
+                color: Colors.purple,
+                subtitle: '${successfulPayments.length} verified subscriptions',
+              ),
             ],
           ),
 
@@ -777,7 +911,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           // Quick Navigation Shortcuts
           Text(
             'Quick Actions',
-            style: AppTextStyle.titleLg(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold),
+            style: AppTextStyle.titleLg(
+              color: AppColors.brandSecondary,
+            ).copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: AppSpacing.md),
 
@@ -785,6 +921,43 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             spacing: AppSpacing.md,
             runSpacing: AppSpacing.md,
             children: [
+              _buildQuickActionButton(
+                label: 'Payment Details',
+                icon: Icons.payments_outlined,
+                onTap: () => setState(() => _activeTab = 'Payment Details'),
+              ),
+              _buildQuickActionButton(
+                label: 'Export Members (Excel)',
+                icon: Icons.file_download_outlined,
+                onTap: () async {
+                  setState(() => _isExporting = true);
+                  try {
+                    final res = await ExcelExportService.exportMembers(
+                      members: adminProvider.approvedUsers,
+                      sheetTitle: 'Approved Members',
+                    );
+                    if (mounted && res != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Approved members exported to Excel!'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Export failed: $e'),
+                          backgroundColor: AppColors.error,
+                        ),
+                      );
+                    }
+                  } finally {
+                    if (mounted) setState(() => _isExporting = false);
+                  }
+                },
+              ),
               _buildQuickActionButton(
                 label: 'Manage Zonal Admins',
                 icon: Icons.person_add_alt_1,
@@ -905,7 +1078,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       ),
       onPressed: onTap,
       icon: Icon(icon, size: 18, color: AppColors.brandPrimary),
-      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+      label: Text(
+        label,
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+      ),
     );
   }
 
@@ -913,7 +1089,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   // 2. Members Management (All / Pending / Approved / Rejected)
   // ==========================================
 
-  Widget _buildSuperAdminUsersView(BuildContext context, String tabType, AdminProvider adminProvider) {
+  Widget _buildSuperAdminUsersView(
+    BuildContext context,
+    String tabType,
+    AdminProvider adminProvider,
+  ) {
     List<UserModel> users;
     if (tabType == 'pending') {
       users = adminProvider.pendingUsers;
@@ -930,13 +1110,19 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     }
 
     final filteredUsers = users.where((u) {
-      final matchesQuery = _userSearchQuery.isEmpty ||
+      final matchesQuery =
+          _userSearchQuery.isEmpty ||
           u.name.toLowerCase().contains(_userSearchQuery.toLowerCase()) ||
           u.phoneNumber.contains(_userSearchQuery) ||
-          (u.membershipId != null && u.membershipId!.toLowerCase().contains(_userSearchQuery.toLowerCase())) ||
-          (u.zone != null && u.zone!.toLowerCase().contains(_userSearchQuery.toLowerCase()));
+          (u.membershipId != null &&
+              u.membershipId!.toLowerCase().contains(
+                _userSearchQuery.toLowerCase(),
+              )) ||
+          (u.zone != null &&
+              u.zone!.toLowerCase().contains(_userSearchQuery.toLowerCase()));
 
-      final matchesStatus = _statusFilter == 'All Statuses' || u.status == _statusFilter;
+      final matchesStatus =
+          _statusFilter == 'All Statuses' || u.status == _statusFilter;
       return matchesQuery && matchesStatus;
     }).toList();
 
@@ -944,7 +1130,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       children: [
         // Filter & Search Bar
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
@@ -956,11 +1145,17 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   controller: _userSearchController,
                   onChanged: (val) => setState(() => _userSearchQuery = val),
                   decoration: InputDecoration(
-                    hintText: 'Search by name, phone, membership ID, or zone...',
+                    hintText:
+                        'Search by name, phone, membership ID, or zone...',
                     prefixIcon: const Icon(Icons.search, size: 20),
                     isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    border: OutlineInputBorder(borderRadius: AppRadius.borderMd),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: AppRadius.borderMd,
+                    ),
                   ),
                 ),
               ),
@@ -976,19 +1171,104 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       value: _statusFilter,
-                      style: const TextStyle(color: AppColors.brandSecondary, fontSize: 13, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        color: AppColors.brandSecondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                       onChanged: (val) {
                         if (val != null) setState(() => _statusFilter = val);
                       },
                       items: const [
-                        DropdownMenuItem(value: 'All Statuses', child: Text('All Statuses')),
-                        DropdownMenuItem(value: 'pending', child: Text('Pending')),
-                        DropdownMenuItem(value: 'approved', child: Text('Approved')),
-                        DropdownMenuItem(value: 'rejected', child: Text('Rejected')),
+                        DropdownMenuItem(
+                          value: 'All Statuses',
+                          child: Text('All Statuses'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'pending',
+                          child: Text('Pending'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'approved',
+                          child: Text('Approved'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'rejected',
+                          child: Text('Rejected'),
+                        ),
                       ],
                     ),
                   ),
                 ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade700,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 11,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: AppRadius.borderMd,
+                  ),
+                ),
+                onPressed: _isExporting
+                    ? null
+                    : () async {
+                        final messenger = ScaffoldMessenger.of(context);
+                        setState(() => _isExporting = true);
+                        try {
+                          final title = tabType == 'pending'
+                              ? 'Pending Members'
+                              : tabType == 'approved'
+                              ? 'Approved Members'
+                              : tabType == 'rejected'
+                              ? 'Rejected Members'
+                              : 'All Members';
+                          final res = await ExcelExportService.exportMembers(
+                            members: filteredUsers,
+                            sheetTitle: title,
+                          );
+                          if (mounted && res != null) {
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Excel sheet downloaded successfully ($title: ${filteredUsers.length} members)',
+                                ),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text('Export failed: $e'),
+                                backgroundColor: AppColors.error,
+                              ),
+                            );
+                          }
+                        } finally {
+                          if (mounted) setState(() => _isExporting = false);
+                        }
+                      },
+                icon: _isExporting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.file_download_outlined, size: 18),
+                label: const Text(
+                  'Export Excel',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
             ],
           ),
         ),
@@ -996,208 +1276,386 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         // User List
         Expanded(
           child: adminProvider.isLoading
-              ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.brandPrimary,
+                  ),
+                )
               : filteredUsers.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.person_off_outlined, size: 48, color: Colors.grey.shade400),
-                          const SizedBox(height: 12),
-                          const Text('No members found matching the criteria.', style: TextStyle(color: Colors.grey)),
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.person_off_outlined,
+                        size: 48,
+                        color: Colors.grey.shade400,
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'No members found matching the criteria.',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  itemCount: filteredUsers.length,
+                  itemBuilder: (context, index) {
+                    final user = filteredUsers[index];
+                    final isExpanded = _expandedUserUid == user.uid;
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: AppRadius.borderLg,
+                        border: Border.all(color: Colors.grey.shade200),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.02),
+                            blurRadius: 6,
+                            offset: const Offset(0, 3),
+                          ),
                         ],
                       ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(AppSpacing.lg),
-                      itemCount: filteredUsers.length,
-                      itemBuilder: (context, index) {
-                        final user = filteredUsers[index];
-                        final isExpanded = _expandedUserUid == user.uid;
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: AppSpacing.md),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: AppRadius.borderLg,
-                            border: Border.all(color: Colors.grey.shade200),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.02),
-                                blurRadius: 6,
-                                offset: const Offset(0, 3),
+                      child: Column(
+                        children: [
+                          ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            leading: CircleAvatar(
+                              radius: 24,
+                              backgroundColor: AppColors.brandPrimary
+                                  .withValues(alpha: 0.1),
+                              child: Text(
+                                user.name.isNotEmpty
+                                    ? user.name[0].toUpperCase()
+                                    : '?',
+                                style: const TextStyle(
+                                  color: AppColors.brandPrimary,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              ListTile(
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                leading: CircleAvatar(
-                                  radius: 24,
-                                  backgroundColor: AppColors.brandPrimary.withValues(alpha: 0.1),
-                                  child: Text(
-                                    user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
-                                    style: const TextStyle(color: AppColors.brandPrimary, fontWeight: FontWeight.bold),
+                            ),
+                            title: Row(
+                              children: [
+                                Text(
+                                  user.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
                                   ),
                                 ),
-                                title: Row(
-                                  children: [
-                                    Text(
-                                      user.name,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    _buildStatusBadge(user.status),
-                                  ],
-                                ),
-                                subtitle: Text(
-                                  'Phone: ${user.phoneNumber} | Zone: ${user.zone ?? "N/A"} | Member ID: ${user.membershipId ?? "N/A"}',
-                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 20),
-                                      tooltip: 'Delete Member',
-                                      onPressed: () => _handleDeleteUser(context, user.uid, adminProvider),
-                                    ),
-                                    IconButton(
-                                      icon: Icon(isExpanded ? Icons.expand_less : Icons.expand_more),
-                                      onPressed: () {
-                                        setState(() {
-                                          if (isExpanded) {
-                                            _expandedUserUid = null;
-                                          } else {
-                                            _expandedUserUid = user.uid;
-                                          }
-                                        });
-                                      },
-                                    ),
-                                  ],
-                                ),
+                                const SizedBox(width: 8),
+                                _buildStatusBadge(user.status),
+                              ],
+                            ),
+                            subtitle: Text(
+                              'Phone: ${user.phoneNumber} | Zone: ${user.zone ?? "N/A"} | Member ID: ${user.membershipId ?? "N/A"}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
                               ),
-                              if (isExpanded) ...[
-                                const Divider(height: 1),
-                                Padding(
-                                  padding: const EdgeInsets.all(AppSpacing.lg),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.edit_outlined,
+                                    color: AppColors.brandPrimary,
+                                    size: 20,
+                                  ),
+                                  tooltip: 'Edit Member',
+                                  onPressed: () => _showEditUserDialog(
+                                    context,
+                                    user,
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    color: AppColors.error,
+                                    size: 20,
+                                  ),
+                                  tooltip: 'Delete Member',
+                                  onPressed: () => _handleDeleteUser(
+                                    context,
+                                    user.uid,
+                                    adminProvider,
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                    isExpanded
+                                        ? Icons.expand_less
+                                        : Icons.expand_more,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      if (isExpanded) {
+                                        _expandedUserUid = null;
+                                      } else {
+                                        _expandedUserUid = user.uid;
+                                      }
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (isExpanded) ...[
+                            const Divider(height: 1),
+                            Padding(
+                              padding: const EdgeInsets.all(AppSpacing.lg),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Wrap(
+                                    spacing: AppSpacing.xl,
+                                    runSpacing: AppSpacing.md,
                                     children: [
-                                      Wrap(
-                                        spacing: AppSpacing.xl,
-                                        runSpacing: AppSpacing.md,
-                                        children: [
-                                          _buildUserDetailTile(Icons.phone_outlined, 'Phone', user.phoneNumber),
-                                          _buildUserDetailTile(Icons.badge_outlined, 'Designation', user.designation ?? 'N/A'),
-                                          _buildUserDetailTile(Icons.business_outlined, 'Institution', user.institution ?? 'N/A'),
-                                          _buildUserDetailTile(Icons.map_outlined, 'Zone', user.zone ?? 'N/A'),
-                                          _buildUserDetailTile(Icons.card_membership_outlined, 'Membership ID', user.membershipId ?? 'N/A'),
-                                          _buildUserDetailTile(Icons.cake_outlined, 'Date of Birth', AppDateFormatter.formatToDateMonthYear(user.dateOfBirth, fallback: 'N/A')),
-                                          _buildUserDetailTile(Icons.event_outlined, 'Date of Join', AppDateFormatter.formatToDateMonthYear(user.dateOfJoin, fallback: 'N/A')),
-                                          _buildUserDetailTile(Icons.work_off_outlined, 'Retirement Date', AppDateFormatter.formatToDateMonthYear(user.dateOfRetirement, fallback: 'N/A')),
-                                          if (user.reviewedByName != null || user.reviewedAt != null)
-                                            _buildUserDetailTile(Icons.verified_user_outlined, 'Reviewed By', '${user.reviewedByName ?? "Admin"} (${user.reviewedAt ?? ""})'),
-                                        ],
+                                      _buildUserDetailTile(
+                                        Icons.phone_outlined,
+                                        'Phone',
+                                        user.phoneNumber,
                                       ),
-                                      const SizedBox(height: AppSpacing.lg),
+                                      _buildUserDetailTile(
+                                        Icons.badge_outlined,
+                                        'Designation',
+                                        user.designation ?? 'N/A',
+                                      ),
+                                      _buildUserDetailTile(
+                                        Icons.business_outlined,
+                                        'Institution',
+                                        user.institution ?? 'N/A',
+                                      ),
+                                      _buildUserDetailTile(
+                                        Icons.map_outlined,
+                                        'Zone',
+                                        user.zone ?? 'N/A',
+                                      ),
+                                      _buildUserDetailTile(
+                                        Icons.card_membership_outlined,
+                                        'Membership ID',
+                                        user.membershipId ?? 'N/A',
+                                      ),
+                                      _buildUserDetailTile(
+                                        Icons.cake_outlined,
+                                        'Date of Birth',
+                                        AppDateFormatter.formatToDateMonthYear(
+                                          user.dateOfBirth,
+                                          fallback: 'N/A',
+                                        ),
+                                      ),
+                                      _buildUserDetailTile(
+                                        Icons.event_outlined,
+                                        'Date of Join',
+                                        AppDateFormatter.formatToDateMonthYear(
+                                          user.dateOfJoin,
+                                          fallback: 'N/A',
+                                        ),
+                                      ),
+                                      _buildUserDetailTile(
+                                        Icons.work_off_outlined,
+                                        'Retirement Date',
+                                        AppDateFormatter.formatToDateMonthYear(
+                                          user.dateOfRetirement,
+                                          fallback: 'N/A',
+                                        ),
+                                      ),
+                                      if (user.reviewedByName != null ||
+                                          user.reviewedAt != null)
+                                        _buildUserDetailTile(
+                                          Icons.verified_user_outlined,
+                                          'Reviewed By',
+                                          '${user.reviewedByName ?? "Admin"} (${AppDateFormatter.formatToDateTime(user.reviewedAt)})',
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: AppSpacing.lg),
 
-                                      // Actions
-                                      Wrap(
-                                        alignment: WrapAlignment.end,
-                                        spacing: 8,
-                                        runSpacing: 8,
-                                        children: [
-                                          if (user.profileImageId != null && user.profileImageId!.isNotEmpty)
-                                            OutlinedButton.icon(
-                                              style: OutlinedButton.styleFrom(
-                                                foregroundColor: AppColors.brandPrimary,
-                                                side: const BorderSide(color: AppColors.brandPrimary),
-                                              ),
-                                              onPressed: () => _viewIdProofDialog(context, user, adminProvider),
-                                              icon: const Icon(Icons.badge, size: 16),
-                                              label: const Text('View Photo ID'),
+                                  // Actions
+                                  Wrap(
+                                    alignment: WrapAlignment.end,
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: [
+                                      ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              AppColors.brandPrimary,
+                                          foregroundColor: Colors.white,
+                                        ),
+                                        onPressed: () => _showEditUserDialog(
+                                          context,
+                                          user,
+                                        ),
+                                        icon: const Icon(
+                                          Icons.edit_outlined,
+                                          size: 16,
+                                        ),
+                                        label: const Text('Edit Member'),
+                                      ),
+                                      if (user.profileImageId != null &&
+                                          user.profileImageId!.isNotEmpty)
+                                        OutlinedButton.icon(
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor:
+                                                AppColors.brandPrimary,
+                                            side: const BorderSide(
+                                              color: AppColors.brandPrimary,
                                             ),
-                                          if (user.status == 'pending') ...[
-                                            OutlinedButton.icon(
-                                              style: OutlinedButton.styleFrom(foregroundColor: AppColors.error),
-                                              onPressed: () => _showRejectDialog(context, user.uid, adminProvider),
-                                              icon: const Icon(Icons.close, size: 16),
-                                              label: const Text('Reject'),
-                                            ),
-                                            ElevatedButton.icon(
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: Colors.green,
-                                                foregroundColor: Colors.white,
-                                              ),
-                                              onPressed: () async {
-                                                final notifProvider = context.read<NotificationProvider>();
-                                                final success = await adminProvider.approveUser(user.uid);
-                                                if (success && context.mounted) {
-                                                  await notifProvider.sendSystemNotification(
-                                                    title: 'Registration Approved',
-                                                    body: 'Your account registration has been approved.',
+                                          ),
+                                          onPressed: () => _viewIdProofDialog(
+                                            context,
+                                            user,
+                                            adminProvider,
+                                          ),
+                                          icon: const Icon(
+                                            Icons.badge,
+                                            size: 16,
+                                          ),
+                                          label: const Text('View Photo ID'),
+                                        ),
+                                      if (user.status == 'pending') ...[
+                                        OutlinedButton.icon(
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: AppColors.error,
+                                          ),
+                                          onPressed: () => _showRejectDialog(
+                                            context,
+                                            user.uid,
+                                            adminProvider,
+                                          ),
+                                          icon: const Icon(
+                                            Icons.close,
+                                            size: 16,
+                                          ),
+                                          label: const Text('Reject'),
+                                        ),
+                                        ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.green,
+                                            foregroundColor: Colors.white,
+                                          ),
+                                          onPressed: () async {
+                                            final notifProvider = context
+                                                .read<NotificationProvider>();
+                                            final success = await adminProvider
+                                                .approveUser(user.uid);
+                                            if (success && context.mounted) {
+                                              await notifProvider
+                                                  .sendSystemNotification(
+                                                    title:
+                                                        'Registration Approved',
+                                                    body:
+                                                        'Your account registration has been approved.',
                                                     routingPath: AppRoutes.home,
                                                     targetUserId: user.uid,
                                                   );
-                                                  if (context.mounted) {
-                                                    ScaffoldMessenger.of(context).showSnackBar(
-                                                      const SnackBar(content: Text('User approved successfully'), backgroundColor: Colors.green),
-                                                    );
-                                                  }
-                                                }
-                                              },
-                                              icon: const Icon(Icons.check, size: 16),
-                                              label: const Text('Approve'),
-                                            ),
-                                          ],
-                                          if (user.status == 'approved') ...[
-                                            OutlinedButton.icon(
-                                              style: OutlinedButton.styleFrom(foregroundColor: Colors.orange.shade800),
-                                              onPressed: () => _showRejectDialog(context, user.uid, adminProvider),
-                                              icon: const Icon(Icons.block, size: 16),
-                                              label: const Text('Revoke / Reject'),
-                                            ),
-                                          ],
-                                          if (user.status == 'rejected') ...[
-                                            ElevatedButton.icon(
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: Colors.green,
-                                                foregroundColor: Colors.white,
-                                              ),
-                                              onPressed: () async {
-                                                final success = await adminProvider.approveUser(user.uid);
-                                                if (success && context.mounted) {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                    const SnackBar(content: Text('User approved successfully'), backgroundColor: Colors.green),
-                                                  );
-                                                }
-                                              },
-                                              icon: const Icon(Icons.check, size: 16),
-                                              label: const Text('Re-Approve'),
-                                            ),
-                                          ],
-                                          OutlinedButton.icon(
-                                            style: OutlinedButton.styleFrom(
-                                              foregroundColor: AppColors.error,
-                                              side: const BorderSide(color: AppColors.error),
-                                            ),
-                                            onPressed: () => _handleDeleteUser(context, user.uid, adminProvider),
-                                            icon: const Icon(Icons.delete_outline, size: 16),
-                                            label: const Text('Delete Member'),
+                                              if (context.mounted) {
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      'User approved successfully',
+                                                    ),
+                                                    backgroundColor:
+                                                        Colors.green,
+                                                  ),
+                                                );
+                                              }
+                                            }
+                                          },
+                                          icon: const Icon(
+                                            Icons.check,
+                                            size: 16,
                                           ),
-                                        ],
+                                          label: const Text('Approve'),
+                                        ),
+                                      ],
+                                      if (user.status == 'approved') ...[
+                                        OutlinedButton.icon(
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor:
+                                                Colors.orange.shade800,
+                                          ),
+                                          onPressed: () => _showRejectDialog(
+                                            context,
+                                            user.uid,
+                                            adminProvider,
+                                          ),
+                                          icon: const Icon(
+                                            Icons.block,
+                                            size: 16,
+                                          ),
+                                          label: const Text('Revoke / Reject'),
+                                        ),
+                                      ],
+                                      if (user.status == 'rejected') ...[
+                                        ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.green,
+                                            foregroundColor: Colors.white,
+                                          ),
+                                          onPressed: () async {
+                                            final success = await adminProvider
+                                                .approveUser(user.uid);
+                                            if (success && context.mounted) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'User approved successfully',
+                                                  ),
+                                                  backgroundColor: Colors.green,
+                                                ),
+                                              );
+                                            }
+                                          },
+                                          icon: const Icon(
+                                            Icons.check,
+                                            size: 16,
+                                          ),
+                                          label: const Text('Re-Approve'),
+                                        ),
+                                      ],
+                                      OutlinedButton.icon(
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: AppColors.error,
+                                          side: const BorderSide(
+                                            color: AppColors.error,
+                                          ),
+                                        ),
+                                        onPressed: () => _handleDeleteUser(
+                                          context,
+                                          user.uid,
+                                          adminProvider,
+                                        ),
+                                        icon: const Icon(
+                                          Icons.delete_outline,
+                                          size: 16,
+                                        ),
+                                        label: const Text('Delete Member'),
                                       ),
                                     ],
                                   ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        );
-                      },
-                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -1222,8 +1680,14 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(4)),
-      child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: fg)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: fg),
+      ),
     );
   }
 
@@ -1239,8 +1703,17 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-                Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(
+                  title,
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                ),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1249,8 +1722,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     );
   }
 
-  void _viewIdProofDialog(BuildContext context, UserModel user, AdminProvider adminProvider) {
-    if (user.profileImageId != null && !adminProvider.userImages.containsKey(user.uid)) {
+  void _viewIdProofDialog(
+    BuildContext context,
+    UserModel user,
+    AdminProvider adminProvider,
+  ) {
+    if (user.profileImageId != null &&
+        !adminProvider.userImages.containsKey(user.uid)) {
       adminProvider.fetchUserImage(user.profileImageId!, user.uid);
     }
 
@@ -1267,21 +1745,44 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   child: Center(child: CircularProgressIndicator()),
                 )
               : imgBase64 != null
-                  ? Image.memory(base64Decode(imgBase64), fit: BoxFit.contain)
-                  : const Text('No Photo document available.'),
+              ? Image.memory(base64Decode(imgBase64), fit: BoxFit.contain)
+              : const Text('No Photo document available.'),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
           ],
         );
       },
     );
   }
 
-  void _handleDeleteUser(BuildContext context, String uid, AdminProvider provider) {
+  Future<void> _showEditUserDialog(
+    BuildContext context,
+    UserModel user,
+  ) async {
+    final updated = await EditMemberDialog.show(context, user);
+    if (updated == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Member "${user.name}" updated successfully.'),
+          backgroundColor: Colors.green.shade700,
+        ),
+      );
+    }
+  }
+
+  void _handleDeleteUser(
+    BuildContext context,
+    String uid,
+    AdminProvider provider,
+  ) {
     _confirmDelete(
       context,
       title: 'Delete Member',
-      content: 'Are you sure you want to permanently delete this member registration? This action cannot be undone.',
+      content:
+          'Are you sure you want to permanently delete this member registration? This action cannot be undone.',
       onConfirm: () async {
         final success = await provider.deleteUser(uid);
         if (success && context.mounted) {
@@ -1296,26 +1797,814 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     );
   }
 
-  void _showRejectDialog(BuildContext context, String uid, AdminProvider provider) {
+  void _showRejectDialog(
+    BuildContext context,
+    String uid,
+    AdminProvider provider,
+  ) {
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
         title: const Text('Reject Registration'),
-        content: const Text('Are you sure you want to reject this member registration?'),
+        content: const Text(
+          'Are you sure you want to reject this member registration?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () async {
               final success = await provider.rejectUser(uid);
               if (success && dialogCtx.mounted) {
                 Navigator.pop(dialogCtx);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Registration rejected'), backgroundColor: AppColors.error),
+                  const SnackBar(
+                    content: Text('Registration rejected'),
+                    backgroundColor: AppColors.error,
+                  ),
                 );
               }
             },
             child: const Text('Confirm Reject'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // 2.b Member Payment Details & Dues
+  // ==========================================
+
+  Widget _buildPaymentDetailsView(BuildContext context) {
+    final paymentProv = context.watch<PaymentProvider>();
+    final adminProv = context.watch<AdminProvider>();
+    final allPayments = paymentProv.allTransactions;
+
+    final filteredPayments = allPayments.where((p) {
+      final q = _paymentSearchQuery.trim().toLowerCase();
+      final matchesQuery = q.isEmpty ||
+          (p.userName ?? '').toLowerCase().contains(q) ||
+          (p.userPhone ?? '').contains(q) ||
+          (p.membershipId ?? '').toLowerCase().contains(q) ||
+          p.paymentId.toLowerCase().contains(q) ||
+          p.orderId.toLowerCase().contains(q) ||
+          (p.receiptNumber ?? '').toLowerCase().contains(q) ||
+          (p.zone ?? '').toLowerCase().contains(q);
+
+      final matchesStatus = _paymentStatusFilter == 'All Statuses' ||
+          p.status.toUpperCase() == _paymentStatusFilter.toUpperCase();
+
+      final matchesZone = _paymentZoneFilter == 'All Zones' ||
+          CommitteeHelper.matchesZone(p.zone, _paymentZoneFilter);
+
+      return matchesQuery && matchesStatus && matchesZone;
+    }).toList();
+
+    // Stats
+    final successfulPayments = allPayments
+        .where((p) => p.status.toUpperCase() == 'SUCCESS')
+        .toList();
+    final totalCollections = successfulPayments.fold<double>(
+      0.0,
+      (sum, p) => sum + p.amount,
+    );
+    final pendingCount = allPayments
+        .where((p) => p.status.toUpperCase() == 'INITIATED')
+        .length;
+    final failedCount = allPayments
+        .where((p) =>
+            p.status.toUpperCase() == 'FAILED' ||
+            p.status.toUpperCase() == 'CANCELLED')
+        .length;
+
+    // Available Zones
+    final Set<String> zonesSet = {'All Zones'};
+    for (final z in adminProv.zones) {
+      if (z.trim().isNotEmpty) zonesSet.add(z.trim());
+    }
+    for (final p in allPayments) {
+      if (p.zone != null && p.zone!.trim().isNotEmpty) {
+        zonesSet.add(p.zone!.trim());
+      }
+    }
+    final availableZones = zonesSet.toList()..sort();
+    final selectedZone = availableZones.contains(_paymentZoneFilter)
+        ? _paymentZoneFilter
+        : 'All Zones';
+
+    final currencyFmt = NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '₹',
+      decimalDigits: 2,
+    );
+
+    return Column(
+      children: [
+        // Top Toolbar
+        Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Title Row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Member Payment Transactions (${filteredPayments.length})',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.brandSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Audit log of membership fees, order IDs, and payment verification records.',
+                        style: TextStyle(color: Colors.grey, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      IconButton(
+                        tooltip: 'Refresh Transactions',
+                        icon: const Icon(Icons.refresh, size: 20),
+                        onPressed: () => context
+                            .read<PaymentProvider>()
+                            .fetchAllTransactions(),
+                      ),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade700,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: AppRadius.borderMd,
+                          ),
+                        ),
+                        onPressed: _isExporting
+                            ? null
+                            : () async {
+                                final messenger = ScaffoldMessenger.of(context);
+                                setState(() => _isExporting = true);
+                                try {
+                                  final res =
+                                      await ExcelExportService.exportPayments(
+                                    payments: filteredPayments,
+                                    zone: selectedZone,
+                                    statusFilter: _paymentStatusFilter,
+                                  );
+                                  if (mounted && res != null) {
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Payment details exported to Excel (${filteredPayments.length} transactions)',
+                                        ),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text('Export failed: $e'),
+                                        backgroundColor: AppColors.error,
+                                      ),
+                                    );
+                                  }
+                                } finally {
+                                  if (mounted) {
+                                    setState(() => _isExporting = false);
+                                  }
+                                }
+                              },
+                        icon: _isExporting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.file_download_outlined,
+                                size: 18),
+                        label: const Text(
+                          'Export Excel',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // KPI Cards Strip
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildPaymentMiniStat(
+                      title: 'Total Collections',
+                      value: currencyFmt.format(totalCollections),
+                      color: Colors.teal,
+                      icon: Icons.account_balance_wallet,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildPaymentMiniStat(
+                      title: 'Successful',
+                      value: successfulPayments.length.toString(),
+                      color: Colors.green,
+                      icon: Icons.check_circle,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildPaymentMiniStat(
+                      title: 'Initiated / Pending',
+                      value: pendingCount.toString(),
+                      color: Colors.orange,
+                      icon: Icons.hourglass_empty,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildPaymentMiniStat(
+                      title: 'Failed / Cancelled',
+                      value: failedCount.toString(),
+                      color: Colors.red,
+                      icon: Icons.error_outline,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Search & Filter Row
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _paymentSearchController,
+                      onChanged: (val) =>
+                          setState(() => _paymentSearchQuery = val),
+                      decoration: InputDecoration(
+                        hintText:
+                            'Search by member name, phone, membership ID, payment ID, or order ID...',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        suffixIcon: _paymentSearchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () {
+                                  setState(() {
+                                    _paymentSearchQuery = '';
+                                    _paymentSearchController.clear();
+                                  });
+                                },
+                              )
+                            : null,
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: AppRadius.borderMd,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Zone Filter Dropdown
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: AppRadius.borderMd,
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: selectedZone,
+                        style: const TextStyle(
+                          color: AppColors.brandSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => _paymentZoneFilter = val);
+                          }
+                        },
+                        items: availableZones.map((z) {
+                          return DropdownMenuItem(
+                            value: z,
+                            child: Text(z),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Status Filter Dropdown
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: AppRadius.borderMd,
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _paymentStatusFilter,
+                        style: const TextStyle(
+                          color: AppColors.brandSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => _paymentStatusFilter = val);
+                          }
+                        },
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'All Statuses',
+                            child: Text('All Statuses'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'SUCCESS',
+                            child: Text('SUCCESS'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'INITIATED',
+                            child: Text('INITIATED'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'FAILED',
+                            child: Text('FAILED'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'CANCELLED',
+                            child: Text('CANCELLED'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // List
+        Expanded(
+          child: paymentProv.isLoadingTransactions
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.brandPrimary,
+                  ),
+                )
+              : filteredPayments.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.receipt_long_outlined,
+                            size: 48,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'No payment transactions found matching criteria.',
+                            style: TextStyle(color: Colors.grey, fontSize: 14),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      itemCount: filteredPayments.length,
+                      itemBuilder: (context, index) {
+                        final p = filteredPayments[index];
+                        final isSuccess = p.status.toUpperCase() == 'SUCCESS';
+                        final isPending = p.status.toUpperCase() == 'INITIATED';
+                        final statusColor = isSuccess
+                            ? Colors.green
+                            : isPending
+                                ? Colors.orange
+                                : Colors.red;
+
+                        final dateStr = p.paidAt != null
+                            ? DateFormat('dd MMM yyyy, hh:mm a')
+                                .format(p.paidAt!)
+                            : '-';
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: AppRadius.borderMd,
+                            border: Border.all(
+                              color: isSuccess
+                                  ? Colors.grey.shade200
+                                  : statusColor.withValues(alpha: 0.3),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.02),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: InkWell(
+                            borderRadius: AppRadius.borderMd,
+                            onTap: () => _showPaymentDetailsModal(context, p),
+                            child: Padding(
+                              padding: const EdgeInsets.all(14),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // Status Indicator / Icon
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withValues(alpha: 0.1),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      isSuccess
+                                          ? Icons.check
+                                          : isPending
+                                              ? Icons.hourglass_top
+                                              : Icons.close,
+                                      color: statusColor,
+                                      size: 22,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+
+                                  // Member & Order info
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                p.userName ?? 'Unknown Member',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 15,
+                                                  color:
+                                                      AppColors.brandSecondary,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            if (p.membershipId != null &&
+                                                p.membershipId!.isNotEmpty) ...[
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 6,
+                                                  vertical: 2,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.brandPrimary
+                                                      .withValues(alpha: 0.08),
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  p.membershipId!,
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                    color:
+                                                        AppColors.brandPrimary,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                            if (p.zone != null &&
+                                                p.zone!.isNotEmpty) ...[
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 6,
+                                                  vertical: 2,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey.shade100,
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  p.zone!,
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: Colors.grey.shade700,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Receipt: ${p.receiptNumber ?? p.paymentId} • Order: ${p.orderId}',
+                                          style: TextStyle(
+                                            color: Colors.grey.shade600,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              dateStr,
+                                              style: TextStyle(
+                                                color: Colors.grey.shade500,
+                                                fontSize: 11,
+                                              ),
+                                            ),
+                                            if (p.paymentMethod != null &&
+                                                p.paymentMethod!
+                                                    .isNotEmpty) ...[
+                                              Text(
+                                                ' • ${p.paymentMethod!.toUpperCase()}',
+                                                style: TextStyle(
+                                                  color: Colors.grey.shade600,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+
+                                  // Amount & Status Chip
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        currencyFmt.format(p.amount),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                          color: isSuccess
+                                              ? AppColors.brandSecondary
+                                              : Colors.grey.shade700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: statusColor
+                                              .withValues(alpha: 0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          p.status.toUpperCase(),
+                                          style: TextStyle(
+                                            color: statusColor,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPaymentMiniStat({
+    required String title,
+    required String value,
+    required Color color,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: AppRadius.borderMd,
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                value,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPaymentDetailsModal(
+      BuildContext context, PaymentTransactionModel p) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+            maxWidth: 600,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Transaction Details',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.brandSecondary,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    _buildPaymentDetailRow('Member Name', p.userName ?? '-'),
+                    _buildPaymentDetailRow(
+                        'Membership ID', p.membershipId ?? '-'),
+                    _buildPaymentDetailRow(
+                        'Phone Number', p.userPhone ?? '-'),
+                    _buildPaymentDetailRow('Email', p.userEmail ?? '-'),
+                    _buildPaymentDetailRow('Zone', p.zone ?? '-'),
+                    _buildPaymentDetailRow(
+                        'Designation', p.designation ?? '-'),
+                    _buildPaymentDetailRow(
+                        'Institution', p.institution ?? '-'),
+                    const Divider(height: 24),
+                    _buildPaymentDetailRow('Amount',
+                        '₹${p.amount.toStringAsFixed(2)} (${p.currency})'),
+                    _buildPaymentDetailRow('Status', p.status.toUpperCase()),
+                    _buildPaymentDetailRow('Payment ID', p.paymentId),
+                    _buildPaymentDetailRow('Order ID', p.orderId),
+                    _buildPaymentDetailRow(
+                        'Receipt Number', p.receiptNumber ?? '-'),
+                    _buildPaymentDetailRow(
+                        'Payment Method', p.paymentMethod?.toUpperCase() ?? '-'),
+                    _buildPaymentDetailRow(
+                        'Purpose', p.purposeLabel ?? p.purpose),
+                    _buildPaymentDetailRow(
+                        'Financial Year', p.financialYear ?? '-'),
+                    _buildPaymentDetailRow('Platform', p.platform ?? '-'),
+                    if (p.paidAt != null)
+                      _buildPaymentDetailRow(
+                          'Paid At',
+                          DateFormat('dd MMM yyyy, hh:mm a')
+                              .format(p.paidAt!)),
+                    if (p.verifiedAt != null)
+                      _buildPaymentDetailRow(
+                          'Verified At',
+                          DateFormat('dd MMM yyyy, hh:mm a')
+                              .format(p.verifiedAt!)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPaymentDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 140,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Expanded(
+            child: SelectableText(
+              value,
+              style: const TextStyle(
+                color: AppColors.brandSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -1336,10 +2625,15 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         children: [
           Text(
             'Zonal Administrators',
-            style: AppTextStyle.headlineSm(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold),
+            style: AppTextStyle.headlineSm(
+              color: AppColors.brandSecondary,
+            ).copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
-          const Text('Create and manage administrator accounts for specific zones.', style: TextStyle(color: Colors.grey, fontSize: 13)),
+          const Text(
+            'Create and manage administrator accounts for specific zones.',
+            style: TextStyle(color: Colors.grey, fontSize: 13),
+          ),
           const SizedBox(height: AppSpacing.xl),
 
           // Create Admin Form
@@ -1355,7 +2649,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Create New Zonal Admin', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  const Text(
+                    'Create New Zonal Admin',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
                   const SizedBox(height: AppSpacing.md),
                   Wrap(
                     spacing: AppSpacing.md,
@@ -1365,26 +2662,44 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                         width: 250,
                         child: TextFormField(
                           controller: _adminUsernameController,
-                          decoration: const InputDecoration(labelText: 'Username *', isDense: true),
-                          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                          decoration: const InputDecoration(
+                            labelText: 'Username *',
+                            isDense: true,
+                          ),
+                          validator: (v) =>
+                              v == null || v.isEmpty ? 'Required' : null,
                         ),
                       ),
                       SizedBox(
                         width: 250,
                         child: TextFormField(
                           controller: _adminPasswordController,
-                          decoration: const InputDecoration(labelText: 'Password *', isDense: true),
+                          decoration: const InputDecoration(
+                            labelText: 'Password *',
+                            isDense: true,
+                          ),
                           obscureText: true,
-                          validator: (v) => v == null || v.length < 6 ? 'Min 6 characters' : null,
+                          validator: (v) => v == null || v.length < 6
+                              ? 'Min 6 characters'
+                              : null,
                         ),
                       ),
                       SizedBox(
                         width: 250,
                         child: DropdownButtonFormField<String>(
                           value: _selectedAdminZone,
-                          decoration: const InputDecoration(labelText: 'Assigned Zone *', isDense: true),
-                          items: zones.map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
-                          onChanged: (val) => setState(() => _selectedAdminZone = val),
+                          decoration: const InputDecoration(
+                            labelText: 'Assigned Zone *',
+                            isDense: true,
+                          ),
+                          items: zones
+                              .map(
+                                (z) =>
+                                    DropdownMenuItem(value: z, child: Text(z)),
+                              )
+                              .toList(),
+                          onChanged: (val) =>
+                              setState(() => _selectedAdminZone = val),
                           validator: (v) => v == null ? 'Required' : null,
                         ),
                       ),
@@ -1394,7 +2709,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.brandPrimary,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 14,
+                            ),
                           ),
                           onPressed: _handleAddAdmin,
                           icon: const Icon(Icons.person_add, size: 18),
@@ -1411,11 +2729,17 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           const SizedBox(height: AppSpacing.xl),
 
           // List Zonal Admins
-          Text('Active Zonal Admins (${admins.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(
+            'Active Zonal Admins (${admins.length})',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           const SizedBox(height: AppSpacing.md),
 
           admins.isEmpty
-              ? const Text('No zonal admins configured yet.', style: TextStyle(color: Colors.grey))
+              ? const Text(
+                  'No zonal admins configured yet.',
+                  style: TextStyle(color: Colors.grey),
+                )
               : ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -1432,17 +2756,31 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                       child: ListTile(
                         leading: const CircleAvatar(
                           backgroundColor: AppColors.brandPrimary,
-                          child: Icon(Icons.person, color: Colors.white, size: 18),
+                          child: Icon(
+                            Icons.person,
+                            color: Colors.white,
+                            size: 18,
+                          ),
                         ),
-                        title: Text(admin.username, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('Zone: ${admin.zone ?? "All"} | Role: ${admin.role}'),
+                        title: Text(
+                          admin.username,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          'Zone: ${admin.zone ?? "All"} | Role: ${admin.role}',
+                        ),
                         trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: AppColors.error,
+                          ),
                           onPressed: () => _confirmDelete(
                             context,
                             title: 'Delete Admin',
-                            content: 'Are you sure you want to delete zonal admin ${admin.username}?',
-                            onConfirm: () => adminProvider.deleteAdmin(admin.username),
+                            content:
+                                'Are you sure you want to delete zonal admin ${admin.username}?',
+                            onConfirm: () =>
+                                adminProvider.deleteAdmin(admin.username),
                           ),
                         ),
                       ),
@@ -1465,9 +2803,17 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Zones Master Registry', style: AppTextStyle.headlineSm(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            'Zones Master Registry',
+            style: AppTextStyle.headlineSm(
+              color: AppColors.brandSecondary,
+            ).copyWith(fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 4),
-          const Text('Define administrative geographic zones for user partitioning and zonal leadership.', style: TextStyle(color: Colors.grey, fontSize: 13)),
+          const Text(
+            'Define administrative geographic zones for user partitioning and zonal leadership.',
+            style: TextStyle(color: Colors.grey, fontSize: 13),
+          ),
           const SizedBox(height: AppSpacing.xl),
 
           // Add Zone Form
@@ -1485,8 +2831,12 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   Expanded(
                     child: TextFormField(
                       controller: _zoneNameController,
-                      decoration: const InputDecoration(labelText: 'New Zone Name (e.g. Kozhikode, Trivandrum)', isDense: true),
-                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                      decoration: const InputDecoration(
+                        labelText: 'New Zone Name (e.g. Kozhikode, Trivandrum)',
+                        isDense: true,
+                      ),
+                      validator: (v) =>
+                          v == null || v.isEmpty ? 'Required' : null,
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -1494,7 +2844,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.brandPrimary,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
                     ),
                     onPressed: _handleAddZone,
                     icon: const Icon(Icons.add_location_alt, size: 18),
@@ -1506,20 +2859,33 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           ),
 
           const SizedBox(height: AppSpacing.xl),
-          Text('Registered Zones (${zones.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(
+            'Registered Zones (${zones.length})',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           const SizedBox(height: AppSpacing.md),
 
           zones.isEmpty
-              ? const Text('No zones configured.', style: TextStyle(color: Colors.grey))
+              ? const Text(
+                  'No zones configured.',
+                  style: TextStyle(color: Colors.grey),
+                )
               : Wrap(
                   spacing: AppSpacing.md,
                   runSpacing: AppSpacing.md,
                   children: zones.map((z) {
                     return Chip(
-                      label: Text(z, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      label: Text(
+                        z,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
                       backgroundColor: Colors.white,
                       side: BorderSide(color: Colors.grey.shade300),
-                      deleteIcon: const Icon(Icons.close, size: 16, color: AppColors.error),
+                      deleteIcon: const Icon(
+                        Icons.close,
+                        size: 16,
+                        color: AppColors.error,
+                      ),
                       onDeleted: () => _confirmDelete(
                         context,
                         title: 'Delete Zone',
@@ -1545,9 +2911,17 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Designations Master Registry', style: AppTextStyle.headlineSm(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            'Designations Master Registry',
+            style: AppTextStyle.headlineSm(
+              color: AppColors.brandSecondary,
+            ).copyWith(fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 4),
-          const Text('Configure official executive titles and designations for committee leaders and members.', style: TextStyle(color: Colors.grey, fontSize: 13)),
+          const Text(
+            'Configure official executive titles and designations for committee leaders and members.',
+            style: TextStyle(color: Colors.grey, fontSize: 13),
+          ),
           const SizedBox(height: AppSpacing.xl),
 
           // Add Designation Form
@@ -1565,8 +2939,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   Expanded(
                     child: TextFormField(
                       controller: _designationNameController,
-                      decoration: const InputDecoration(labelText: 'New Designation (e.g. President, General Secretary, Treasurer)', isDense: true),
-                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                      decoration: const InputDecoration(
+                        labelText:
+                            'New Designation (e.g. President, General Secretary, Treasurer)',
+                        isDense: true,
+                      ),
+                      validator: (v) =>
+                          v == null || v.isEmpty ? 'Required' : null,
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -1574,7 +2953,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.brandPrimary,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
                     ),
                     onPressed: _handleAddDesignation,
                     icon: const Icon(Icons.badge, size: 18),
@@ -1586,24 +2968,38 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           ),
 
           const SizedBox(height: AppSpacing.xl),
-          Text('Registered Designations (${designations.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(
+            'Registered Designations (${designations.length})',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           const SizedBox(height: AppSpacing.md),
 
           designations.isEmpty
-              ? const Text('No designations configured.', style: TextStyle(color: Colors.grey))
+              ? const Text(
+                  'No designations configured.',
+                  style: TextStyle(color: Colors.grey),
+                )
               : Wrap(
                   spacing: AppSpacing.md,
                   runSpacing: AppSpacing.md,
                   children: designations.map((d) {
                     return Chip(
-                      label: Text(d, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      label: Text(
+                        d,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
                       backgroundColor: Colors.white,
                       side: BorderSide(color: Colors.grey.shade300),
-                      deleteIcon: const Icon(Icons.close, size: 16, color: AppColors.error),
+                      deleteIcon: const Icon(
+                        Icons.close,
+                        size: 16,
+                        color: AppColors.error,
+                      ),
                       onDeleted: () => _confirmDelete(
                         context,
                         title: 'Delete Designation',
-                        content: 'Are you sure you want to remove designation $d?',
+                        content:
+                            'Are you sure you want to remove designation $d?',
                         onConfirm: () => adminProvider.deleteDesignation(d),
                       ),
                     );
@@ -1628,7 +3024,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
@@ -1636,100 +3035,217 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('State Committee Members (${sortedMembers.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.person_add, size: 18),
-                label: const Text('Add Member'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.brandPrimary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              Text(
+                'State Committee Members (${sortedMembers.length})',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
                 ),
-                onPressed: () => AddCommitteeMemberDialog.show(context, isState: true),
+              ),
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    icon: _isExporting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.file_download_outlined, size: 18),
+                    label: const Text('Export Excel'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade700,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppRadius.borderMd,
+                      ),
+                    ),
+                    onPressed: _isExporting
+                        ? null
+                        : () async {
+                            final messenger = ScaffoldMessenger.of(context);
+                            setState(() => _isExporting = true);
+                            try {
+                              final res =
+                                  await ExcelExportService.exportCommitteeMembers(
+                                members: sortedMembers,
+                                committeeType: 'State Committee',
+                              );
+                              if (mounted && res != null) {
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'State Committee exported to Excel (${sortedMembers.length} members)',
+                                    ),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text('Export failed: $e'),
+                                    backgroundColor: AppColors.error,
+                                  ),
+                                );
+                              }
+                            } finally {
+                              if (mounted) setState(() => _isExporting = false);
+                            }
+                          },
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.person_add, size: 18),
+                    label: const Text('Add Member'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.brandPrimary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                    ),
+                    onPressed: () =>
+                        AddCommitteeMemberDialog.show(context, isState: true),
+                  ),
+                ],
               ),
             ],
           ),
         ),
         Expanded(
           child: adminProvider.isLoading
-              ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.brandPrimary,
+                  ),
+                )
               : sortedMembers.isEmpty
-                  ? const Center(child: Text('No State Committee members found.'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(AppSpacing.lg),
-                      itemCount: sortedMembers.length,
-                      itemBuilder: (context, index) {
-                        final m = sortedMembers[index];
-                        if (m.profileImageId != null && m.profileImageId!.isNotEmpty && !adminProvider.userImages.containsKey(m.uid)) {
-                          adminProvider.fetchUserImage(m.profileImageId!, m.uid);
-                        }
-                        final imgBase64 = adminProvider.userImages[m.uid];
-                        ImageProvider? imageProvider;
-                        if (m.profileImageId != null && m.profileImageId!.startsWith('http')) {
-                          imageProvider = NetworkImage(m.profileImageId!);
-                        } else if (imgBase64 != null && imgBase64.isNotEmpty) {
-                          try {
-                            imageProvider = MemoryImage(base64Decode(imgBase64));
-                          } catch (_) {}
-                        }
+              ? const Center(child: Text('No State Committee members found.'))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  itemCount: sortedMembers.length,
+                  itemBuilder: (context, index) {
+                    final m = sortedMembers[index];
+                    if (m.profileImageId != null &&
+                        m.profileImageId!.isNotEmpty &&
+                        !adminProvider.userImages.containsKey(m.uid)) {
+                      adminProvider.fetchUserImage(m.profileImageId!, m.uid);
+                    }
+                    final imgBase64 = adminProvider.userImages[m.uid];
+                    ImageProvider? imageProvider;
+                    if (m.profileImageId != null &&
+                        m.profileImageId!.startsWith('http')) {
+                      imageProvider = NetworkImage(m.profileImageId!);
+                    } else if (imgBase64 != null && imgBase64.isNotEmpty) {
+                      try {
+                        imageProvider = MemoryImage(base64Decode(imgBase64));
+                      } catch (_) {}
+                    }
 
-                        final displayDes = CommitteeHelper.getDisplayDesignation(m, true);
+                    final displayDes = CommitteeHelper.getDisplayDesignation(
+                      m,
+                      true,
+                    );
 
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: AppSpacing.md),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: AppRadius.borderMd,
-                            border: Border.all(color: Colors.grey.shade200),
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: AppRadius.borderMd,
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          radius: 24,
+                          backgroundColor: AppColors.brandPrimary.withValues(
+                            alpha: 0.1,
                           ),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              radius: 24,
-                              backgroundColor: AppColors.brandPrimary.withValues(alpha: 0.1),
-                              backgroundImage: imageProvider,
-                              child: imageProvider == null
-                                  ? Text(
-                                      m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
-                                      style: const TextStyle(color: AppColors.brandPrimary, fontWeight: FontWeight.bold),
-                                    )
-                                  : null,
-                            ),
-                            title: Text(m.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text('$displayDes | Phone: ${m.phoneNumber} | Zone: ${m.zone ?? "N/A"} | ID: ${m.membershipId ?? "N/A"}'),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete_outline, color: AppColors.error),
-                              tooltip: 'Remove from State Committee',
-                              onPressed: () async {
-                                final confirm = await showDialog<bool>(
-                                  context: context,
-                                  builder: (ctx) => AlertDialog(
-                                    title: const Text('Remove from State Committee?'),
-                                    content: Text('Are you sure you want to remove ${m.name} ($displayDes) from the State Committee?'),
-                                    actions: [
-                                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                                      ElevatedButton(
-                                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-                                        onPressed: () => Navigator.pop(ctx, true),
-                                        child: const Text('Remove', style: TextStyle(color: Colors.white)),
-                                      ),
-                                    ],
+                          backgroundImage: imageProvider,
+                          child: imageProvider == null
+                              ? Text(
+                                  m.name.isNotEmpty
+                                      ? m.name[0].toUpperCase()
+                                      : '?',
+                                  style: const TextStyle(
+                                    color: AppColors.brandPrimary,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                );
-                                if (confirm == true && context.mounted) {
-                                  await adminProvider.removeMemberFromCommittee(uid: m.uid, isState: true);
-                                }
-                              },
-                            ),
+                                )
+                              : null,
+                        ),
+                        title: Text(
+                          m.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          '$displayDes | Phone: ${m.phoneNumber} | Zone: ${m.zone ?? "N/A"} | ID: ${m.membershipId ?? "N/A"}',
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: AppColors.error,
                           ),
-                        );
-                      },
-                    ),
+                          tooltip: 'Remove from State Committee',
+                          onPressed: () async {
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text(
+                                  'Remove from State Committee?',
+                                ),
+                                content: Text(
+                                  'Are you sure you want to remove ${m.name} ($displayDes) from the State Committee?',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.error,
+                                    ),
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    child: const Text(
+                                      'Remove',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirm == true && context.mounted) {
+                              await adminProvider.removeMemberFromCommittee(
+                                uid: m.uid,
+                                isState: true,
+                              );
+                            }
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
   }
 
-  void _showStateMemberDialog(BuildContext context, {CommitteeMemberModel? member}) {
+  void _showStateMemberDialog(
+    BuildContext context, {
+    CommitteeMemberModel? member,
+  }) {
     final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController(text: member?.name ?? '');
     final phoneCtrl = TextEditingController(text: member?.phoneNumber ?? '');
@@ -1745,7 +3261,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(member == null ? 'Add State Committee Member' : 'Update State Member'),
+          title: Text(
+            member == null
+                ? 'Add State Committee Member'
+                : 'Update State Member',
+          ),
           content: SingleChildScrollView(
             child: Form(
               key: formKey,
@@ -1755,7 +3275,12 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   GestureDetector(
                     onTap: () async {
                       final picker = ImagePicker();
-                      final img = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 300, maxHeight: 300);
+                      final img = await picker.pickImage(
+                        source: ImageSource.gallery,
+                        imageQuality: 80,
+                        maxWidth: 300,
+                        maxHeight: 300,
+                      );
                       if (img != null) {
                         final bytes = await img.readAsBytes();
                         setDialogState(() => photoBase64 = base64Encode(bytes));
@@ -1764,65 +3289,97 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                     child: CircleAvatar(
                       radius: 36,
                       backgroundColor: Colors.grey.shade100,
-                      backgroundImage: photoBase64 != null ? MemoryImage(base64Decode(photoBase64!)) : null,
-                      child: photoBase64 == null ? const Icon(Icons.add_a_photo, size: 28, color: Colors.grey) : null,
+                      backgroundImage: photoBase64 != null
+                          ? MemoryImage(base64Decode(photoBase64!))
+                          : null,
+                      child: photoBase64 == null
+                          ? const Icon(
+                              Icons.add_a_photo,
+                              size: 28,
+                              color: Colors.grey,
+                            )
+                          : null,
                     ),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: nameCtrl,
                     decoration: const InputDecoration(labelText: 'Full Name *'),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     value: selectedDesignation,
-                    decoration: const InputDecoration(labelText: 'Designation *'),
-                    items: designations.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
-                    onChanged: (val) => setDialogState(() => selectedDesignation = val),
+                    decoration: const InputDecoration(
+                      labelText: 'Designation *',
+                    ),
+                    items: designations
+                        .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                        .toList(),
+                    onChanged: (val) =>
+                        setDialogState(() => selectedDesignation = val),
                     validator: (v) => v == null ? 'Required' : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: phoneCtrl,
-                    decoration: const InputDecoration(labelText: 'Phone Number *'),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Phone Number *',
+                    ),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: emailCtrl,
-                    decoration: const InputDecoration(labelText: 'Email Address'),
+                    decoration: const InputDecoration(
+                      labelText: 'Email Address',
+                    ),
                   ),
                 ],
               ),
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Cancel'),
+            ),
             ElevatedButton(
               onPressed: () async {
                 if (formKey.currentState!.validate()) {
                   final newMember = CommitteeMemberModel(
-                    id: member?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                    id:
+                        member?.id ??
+                        DateTime.now().millisecondsSinceEpoch.toString(),
                     name: nameCtrl.text.trim(),
                     designation: selectedDesignation ?? '',
                     phoneNumber: phoneCtrl.text.trim(),
                     email: emailCtrl.text.trim(),
                     photoBase64: photoBase64,
-                    createdAt: member?.createdAt ?? DateTime.now().toIso8601String(),
+                    createdAt:
+                        member?.createdAt ?? DateTime.now().toIso8601String(),
                   );
                   bool success;
                   if (member == null) {
-                    success = await context.read<StateCommitteeProvider>().addMember(newMember);
+                    success = await context
+                        .read<StateCommitteeProvider>()
+                        .addMember(newMember);
                     if (success && dialogCtx.mounted) {
-                      await dialogCtx.read<NotificationProvider>().sendSystemNotification(
-                        title: 'New State Committee Member',
-                        body: '${newMember.name} joined the State Committee.',
-                        routingPath: AppRoutes.stateCommittee,
-                      );
+                      await dialogCtx
+                          .read<NotificationProvider>()
+                          .sendSystemNotification(
+                            title: 'New State Committee Member',
+                            body:
+                                '${newMember.name} joined the State Committee.',
+                            routingPath: AppRoutes.stateCommittee,
+                          );
                     }
                   } else {
-                    success = await context.read<StateCommitteeProvider>().updateMember(newMember);
+                    success = await context
+                        .read<StateCommitteeProvider>()
+                        .updateMember(newMember);
                   }
                   if (success && dialogCtx.mounted) Navigator.pop(dialogCtx);
                 }
@@ -1847,46 +3404,73 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     return _buildZonalOrExecutiveCommitteeView(context, isExecutive: false);
   }
 
-  Widget _buildZonalOrExecutiveCommitteeView(BuildContext context, {required bool isExecutive}) {
+  Widget _buildZonalOrExecutiveCommitteeView(
+    BuildContext context, {
+    required bool isExecutive,
+  }) {
     final adminProv = context.watch<AdminProvider>();
     final allMembers = isExecutive
         ? CommitteeHelper.sortMembers(
-            adminProv.approvedUsers.where((m) => CommitteeHelper.isExecutiveCommitteeMember(m)).toList(),
+            adminProv.approvedUsers
+                .where((m) => CommitteeHelper.isExecutiveCommitteeMember(m))
+                .toList(),
             false,
           )
-        : CommitteeHelper.sortZonalMembers(adminProv.approvedUsers);
+        : CommitteeHelper.sortZonalMembers(
+            adminProv.approvedUsers
+                .where((m) => CommitteeHelper.isZonalCommitteeMember(m))
+                .toList(),
+          );
 
     // Collect all valid zones from both adminProv.zones and users
     bool isNonZonal(String z) {
       final l = z.trim().toLowerCase();
       return l.isEmpty || l == 'all' || l == 'state' || l.contains('executive');
     }
+
     final Map<String, String> uniqueZones = {};
     for (final z in adminProv.zones) {
       if (!isNonZonal(z)) uniqueZones[z.trim().toLowerCase()] = z.trim();
     }
     for (final m in adminProv.approvedUsers) {
       final mZone = m.zone ?? '';
-      if (!isNonZonal(mZone)) uniqueZones[mZone.trim().toLowerCase()] = mZone.trim();
+      if (!isNonZonal(mZone))
+        uniqueZones[mZone.trim().toLowerCase()] = mZone.trim();
     }
     final zones = uniqueZones.values.toList()..sort();
 
     final filtered = allMembers.where((m) {
-      final matchesZone = isExecutive || CommitteeHelper.matchesZone(m.zone, _committeeZoneFilter);
-      final displayDes = isExecutive ? CommitteeHelper.getDisplayDesignation(m, false) : (m.designation ?? 'Member');
-      final matchesQuery = _committeeSearchQuery.isEmpty ||
+      final matchesZone =
+          isExecutive ||
+          CommitteeHelper.matchesZone(m.zone, _committeeZoneFilter);
+      final displayDes = isExecutive
+          ? CommitteeHelper.getDisplayDesignation(m, false)
+          : CommitteeHelper.getDisplayDesignation(m, CommitteeType.zonal);
+      final matchesQuery =
+          _committeeSearchQuery.isEmpty ||
           m.name.toLowerCase().contains(_committeeSearchQuery.toLowerCase()) ||
-          displayDes.toLowerCase().contains(_committeeSearchQuery.toLowerCase()) ||
-          m.phoneNumber.toLowerCase().contains(_committeeSearchQuery.toLowerCase()) ||
-          (m.zone ?? '').toLowerCase().contains(_committeeSearchQuery.toLowerCase()) ||
-          (m.membershipId ?? '').toLowerCase().contains(_committeeSearchQuery.toLowerCase());
+          displayDes.toLowerCase().contains(
+            _committeeSearchQuery.toLowerCase(),
+          ) ||
+          m.phoneNumber.toLowerCase().contains(
+            _committeeSearchQuery.toLowerCase(),
+          ) ||
+          (m.zone ?? '').toLowerCase().contains(
+            _committeeSearchQuery.toLowerCase(),
+          ) ||
+          (m.membershipId ?? '').toLowerCase().contains(
+            _committeeSearchQuery.toLowerCase(),
+          );
       return matchesZone && matchesQuery;
     }).toList();
 
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
@@ -1895,9 +3479,75 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             children: [
               Text(
                 '${isExecutive ? "Executive" : "Zonal"} Committee Members (${filtered.length})',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
               const Spacer(),
+              ElevatedButton.icon(
+                icon: _isExporting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.file_download_outlined, size: 18),
+                label: const Text('Export Excel'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade700,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: AppRadius.borderMd,
+                  ),
+                ),
+                onPressed: _isExporting
+                    ? null
+                    : () async {
+                        final messenger = ScaffoldMessenger.of(context);
+                        setState(() => _isExporting = true);
+                        try {
+                          final res =
+                              await ExcelExportService.exportCommitteeMembers(
+                            members: filtered,
+                            committeeType: isExecutive
+                                ? 'Executive Committee'
+                                : 'Zonal Committee',
+                            zone: isExecutive ? null : _committeeZoneFilter,
+                          );
+                          if (mounted && res != null) {
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  '${isExecutive ? "Executive" : "Zonal"} Committee exported to Excel (${filtered.length} members)',
+                                ),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text('Export failed: $e'),
+                                backgroundColor: AppColors.error,
+                              ),
+                            );
+                          }
+                        } finally {
+                          if (mounted) setState(() => _isExporting = false);
+                        }
+                      },
+              ),
+              const SizedBox(width: 8),
               if (isExecutive) ...[
                 ElevatedButton.icon(
                   icon: const Icon(Icons.person_add, size: 18),
@@ -1905,9 +3555,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.brandPrimary,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
                   ),
-                  onPressed: () => AddCommitteeMemberDialog.show(context, isState: false),
+                  onPressed: () =>
+                      AddCommitteeMemberDialog.show(context, isState: false),
                 ),
               ],
               if (!isExecutive) ...[
@@ -1923,15 +3577,41 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                       value: ['All', ...zones].contains(_committeeZoneFilter)
                           ? _committeeZoneFilter
                           : 'All',
-                      style: const TextStyle(color: AppColors.brandSecondary, fontSize: 13, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        color: AppColors.brandSecondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                       onChanged: (val) {
-                        if (val != null) setState(() => _committeeZoneFilter = val);
+                        if (val != null)
+                          setState(() => _committeeZoneFilter = val);
                       },
-                      items: ['All', ...zones].map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
+                      items: ['All', ...zones]
+                          .map(
+                            (z) => DropdownMenuItem(value: z, child: Text(z)),
+                          )
+                          .toList(),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.person_add, size: 18),
+                  label: const Text('Add Member'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.brandPrimary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                  ),
+                  onPressed: () => AddCommitteeMemberDialog.show(
+                    context,
+                    committeeType: CommitteeType.zonal,
+                    targetZone: _committeeZoneFilter,
+                  ),
+                ),
               ],
             ],
           ),
@@ -1944,12 +3624,15 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   itemCount: filtered.length,
                   itemBuilder: (context, index) {
                     final m = filtered[index];
-                    if (m.profileImageId != null && m.profileImageId!.isNotEmpty && !adminProv.userImages.containsKey(m.uid)) {
+                    if (m.profileImageId != null &&
+                        m.profileImageId!.isNotEmpty &&
+                        !adminProv.userImages.containsKey(m.uid)) {
                       adminProv.fetchUserImage(m.profileImageId!, m.uid);
                     }
                     final imgBase64 = adminProv.userImages[m.uid];
                     ImageProvider? imageProvider;
-                    if (m.profileImageId != null && m.profileImageId!.startsWith('http')) {
+                    if (m.profileImageId != null &&
+                        m.profileImageId!.startsWith('http')) {
                       imageProvider = NetworkImage(m.profileImageId!);
                     } else if (imgBase64 != null && imgBase64.isNotEmpty) {
                       try {
@@ -1959,7 +3642,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
                     final displayDes = isExecutive
                         ? CommitteeHelper.getDisplayDesignation(m, false)
-                        : (m.designation ?? "Member");
+                        : CommitteeHelper.getDisplayDesignation(
+                            m,
+                            CommitteeType.zonal,
+                          );
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -1971,43 +3657,76 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                       child: ListTile(
                         leading: CircleAvatar(
                           radius: 24,
-                          backgroundColor: AppColors.brandPrimary.withValues(alpha: 0.1),
+                          backgroundColor: AppColors.brandPrimary.withValues(
+                            alpha: 0.1,
+                          ),
                           backgroundImage: imageProvider,
                           child: imageProvider == null
                               ? Text(
-                                  m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
-                                  style: const TextStyle(color: AppColors.brandPrimary, fontWeight: FontWeight.bold),
+                                  m.name.isNotEmpty
+                                      ? m.name[0].toUpperCase()
+                                      : '?',
+                                  style: const TextStyle(
+                                    color: AppColors.brandPrimary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 )
                               : null,
                         ),
-                        title: Text(m.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('${isExecutive ? "Executive Committee" : "Zone: ${m.zone ?? 'N/A'}"} | Designation: $displayDes | Phone: ${m.phoneNumber} | ID: ${m.membershipId ?? "N/A"}'),
-                        trailing: isExecutive
-                            ? IconButton(
-                                icon: const Icon(Icons.delete_outline, color: AppColors.error),
-                                tooltip: 'Remove from Executive Committee',
-                                onPressed: () async {
-                                  final confirm = await showDialog<bool>(
-                                    context: context,
-                                    builder: (ctx) => AlertDialog(
-                                      title: const Text('Remove from Executive Committee?'),
-                                      content: Text('Are you sure you want to remove ${m.name} ($displayDes) from the Executive Committee?'),
-                                      actions: [
-                                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                                        ElevatedButton(
-                                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-                                          onPressed: () => Navigator.pop(ctx, true),
-                                          child: const Text('Remove', style: TextStyle(color: Colors.white)),
-                                        ),
-                                      ],
+                        title: Text(
+                          m.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          '${isExecutive ? "Executive Committee" : "Zone: ${m.zone ?? 'N/A'}"} | Designation: $displayDes | Phone: ${m.phoneNumber} | ID: ${m.membershipId ?? "N/A"}',
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: AppColors.error,
+                          ),
+                          tooltip: isExecutive
+                              ? 'Remove from Executive Committee'
+                              : 'Remove from Zonal Committee',
+                          onPressed: () async {
+                            final committeeName = isExecutive
+                                ? 'Executive Committee'
+                                : 'Zonal Committee';
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: Text('Remove from $committeeName?'),
+                                content: Text(
+                                  'Are you sure you want to remove ${m.name} ($displayDes) from the $committeeName?',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.error,
                                     ),
-                                  );
-                                  if (confirm == true && context.mounted) {
-                                    await adminProv.removeMemberFromCommittee(uid: m.uid, isState: false);
-                                  }
-                                },
-                              )
-                            : null,
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    child: const Text(
+                                      'Remove',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirm == true && context.mounted) {
+                              await adminProv.removeMemberFromCommittee(
+                                uid: m.uid,
+                                type: isExecutive
+                                    ? CommitteeType.executive
+                                    : CommitteeType.zonal,
+                              );
+                            }
+                          },
+                        ),
                       ),
                     );
                   },
@@ -2017,7 +3736,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     );
   }
 
-  void _showZonalMemberDialog(BuildContext context, {ZonalMemberModel? member, required bool isExecutive}) {
+  void _showZonalMemberDialog(
+    BuildContext context, {
+    ZonalMemberModel? member,
+    required bool isExecutive,
+  }) {
     final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController(text: member?.name ?? '');
     final phoneCtrl = TextEditingController(text: member?.phoneNumber ?? '');
@@ -2030,13 +3753,20 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     if (selectedZone == null && zones.isNotEmpty) selectedZone = zones.first;
 
     String? selectedDesignation = member?.designation;
-    if (selectedDesignation == null && designations.isNotEmpty) selectedDesignation = designations.first;
+    if (selectedDesignation == null && designations.isNotEmpty)
+      selectedDesignation = designations.first;
 
     showDialog(
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(member == null ? (isExecutive ? 'Add Executive Member' : 'Add Zonal Member') : (isExecutive ? 'Update Executive Member' : 'Update Zonal Member')),
+          title: Text(
+            member == null
+                ? (isExecutive ? 'Add Executive Member' : 'Add Zonal Member')
+                : (isExecutive
+                      ? 'Update Executive Member'
+                      : 'Update Zonal Member'),
+          ),
           content: SingleChildScrollView(
             child: Form(
               key: formKey,
@@ -2046,7 +3776,12 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   GestureDetector(
                     onTap: () async {
                       final picker = ImagePicker();
-                      final img = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 300, maxHeight: 300);
+                      final img = await picker.pickImage(
+                        source: ImageSource.gallery,
+                        imageQuality: 80,
+                        maxWidth: 300,
+                        maxHeight: 300,
+                      );
                       if (img != null) {
                         final bytes = await img.readAsBytes();
                         setDialogState(() => photoBase64 = base64Encode(bytes));
@@ -2055,71 +3790,117 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                     child: CircleAvatar(
                       radius: 36,
                       backgroundColor: Colors.grey.shade100,
-                      backgroundImage: photoBase64 != null ? MemoryImage(base64Decode(photoBase64!)) : null,
-                      child: photoBase64 == null ? const Icon(Icons.add_a_photo, size: 28, color: Colors.grey) : null,
+                      backgroundImage: photoBase64 != null
+                          ? MemoryImage(base64Decode(photoBase64!))
+                          : null,
+                      child: photoBase64 == null
+                          ? const Icon(
+                              Icons.add_a_photo,
+                              size: 28,
+                              color: Colors.grey,
+                            )
+                          : null,
                     ),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: nameCtrl,
                     decoration: const InputDecoration(labelText: 'Full Name *'),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                   ),
                   const SizedBox(height: 12),
                   if (!isExecutive) ...[
                     DropdownButtonFormField<String>(
-                      value: selectedZone != null && zones.any((z) => z.toLowerCase() == selectedZone?.toLowerCase())
-                          ? zones.firstWhere((z) => z.toLowerCase() == selectedZone?.toLowerCase())
+                      value:
+                          selectedZone != null &&
+                              zones.any(
+                                (z) =>
+                                    z.toLowerCase() ==
+                                    selectedZone?.toLowerCase(),
+                              )
+                          ? zones.firstWhere(
+                              (z) =>
+                                  z.toLowerCase() ==
+                                  selectedZone?.toLowerCase(),
+                            )
                           : (zones.isNotEmpty ? zones.first : null),
                       decoration: const InputDecoration(labelText: 'Zone *'),
-                      items: zones.map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
-                      onChanged: (val) => setDialogState(() => selectedZone = val),
+                      items: zones
+                          .map(
+                            (z) => DropdownMenuItem(value: z, child: Text(z)),
+                          )
+                          .toList(),
+                      onChanged: (val) =>
+                          setDialogState(() => selectedZone = val),
                       validator: (v) => v == null ? 'Required' : null,
                     ),
                     const SizedBox(height: 12),
                   ],
                   DropdownButtonFormField<String>(
                     value: selectedDesignation,
-                    decoration: const InputDecoration(labelText: 'Designation *'),
-                    items: designations.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
-                    onChanged: (val) => setDialogState(() => selectedDesignation = val),
+                    decoration: const InputDecoration(
+                      labelText: 'Designation *',
+                    ),
+                    items: designations
+                        .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                        .toList(),
+                    onChanged: (val) =>
+                        setDialogState(() => selectedDesignation = val),
                     validator: (v) => v == null ? 'Required' : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: phoneCtrl,
-                    decoration: const InputDecoration(labelText: 'Phone Number *'),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Phone Number *',
+                    ),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: emailCtrl,
-                    decoration: const InputDecoration(labelText: 'Email Address (Optional)'),
+                    decoration: const InputDecoration(
+                      labelText: 'Email Address (Optional)',
+                    ),
                   ),
                 ],
               ),
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Cancel'),
+            ),
             ElevatedButton(
               onPressed: () async {
                 if (formKey.currentState!.validate()) {
                   final newMember = ZonalMemberModel(
-                    id: member?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                    id:
+                        member?.id ??
+                        DateTime.now().millisecondsSinceEpoch.toString(),
                     name: nameCtrl.text.trim(),
                     designation: selectedDesignation ?? '',
                     phoneNumber: phoneCtrl.text.trim(),
                     email: emailCtrl.text.trim(),
-                    zone: isExecutive ? 'Executive Committee' : (selectedZone ?? ''),
+                    zone: isExecutive
+                        ? 'Executive Committee'
+                        : (selectedZone ?? ''),
                     photoBase64: photoBase64,
-                    createdAt: member?.createdAt ?? DateTime.now().toIso8601String(),
+                    createdAt:
+                        member?.createdAt ?? DateTime.now().toIso8601String(),
                   );
                   bool success;
                   if (member == null) {
-                    success = await context.read<ZonalProvider>().addMember(newMember);
+                    success = await context.read<ZonalProvider>().addMember(
+                      newMember,
+                    );
                   } else {
-                    success = await context.read<ZonalProvider>().updateMember(newMember);
+                    success = await context.read<ZonalProvider>().updateMember(
+                      newMember,
+                    );
                   }
                   if (success && dialogCtx.mounted) Navigator.pop(dialogCtx);
                 }
@@ -2143,7 +3924,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
@@ -2151,9 +3935,18 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Meeting Minutes (${minutes.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text(
+                'Meeting Minutes (${minutes.length})',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
               ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.brandPrimary, foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brandPrimary,
+                  foregroundColor: Colors.white,
+                ),
                 onPressed: () => _showMeetingMinutesDialog(context),
                 icon: const Icon(Icons.upload_file, size: 18),
                 label: const Text('Publish Minutes PDF'),
@@ -2163,73 +3956,100 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         ),
         Expanded(
           child: provider.isLoading
-              ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.brandPrimary,
+                  ),
+                )
               : minutes.isEmpty
-                  ? const Center(child: Text('No meeting minutes found.'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(AppSpacing.lg),
-                      itemCount: minutes.length,
-                      itemBuilder: (context, index) {
-                        final m = minutes[index];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: AppSpacing.md),
+              ? const Center(child: Text('No meeting minutes found.'))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  itemCount: minutes.length,
+                  itemBuilder: (context, index) {
+                    final m = minutes[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: AppRadius.borderMd,
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: Colors.blue.shade50,
                             borderRadius: AppRadius.borderMd,
-                            border: Border.all(color: Colors.grey.shade200),
                           ),
-                          child: ListTile(
-                            leading: Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: AppRadius.borderMd),
-                              child: const Icon(Icons.picture_as_pdf, color: Colors.blue, size: 24),
+                          child: const Icon(
+                            Icons.picture_as_pdf,
+                            color: Colors.blue,
+                            size: 24,
+                          ),
+                        ),
+                        title: Text(
+                          m.title,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          'Date: ${AppDateFormatter.formatToDateMonthYear(m.date)} | Zone: ${m.zone.isNotEmpty ? m.zone : "All"} | Status: ${m.status.toUpperCase()}',
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () =>
+                                  _showMeetingMinutesDialog(context, minute: m),
                             ),
-                            title: Text(m.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text('Date: ${m.date} | Zone: ${m.zone.isNotEmpty ? m.zone : "All"} | Status: ${m.status.toUpperCase()}'),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit, color: Colors.blue),
-                                  onPressed: () => _showMeetingMinutesDialog(context, minute: m),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.visibility, color: Colors.green),
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => AppPdfViewerScreen(
-                                          title: m.title,
-                                          pdfUrl: m.pdfUrl,
-                                          folderName: 'meeting_minutes',
-                                          docId: m.id,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: AppColors.error),
-                                  onPressed: () => _confirmDelete(
-                                    context,
-                                    title: 'Delete Minutes',
-                                    content: 'Are you sure you want to delete ${m.title}?',
-                                    onConfirm: () => provider.deleteMinutes(m),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.visibility,
+                                color: Colors.green,
+                              ),
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => AppPdfViewerScreen(
+                                      title: m.title,
+                                      pdfUrl: m.pdfUrl,
+                                      folderName: 'meeting_minutes',
+                                      docId: m.id,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                );
+                              },
                             ),
-                          ),
-                        );
-                      },
-                    ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete,
+                                color: AppColors.error,
+                              ),
+                              onPressed: () => _confirmDelete(
+                                context,
+                                title: 'Delete Minutes',
+                                content:
+                                    'Are you sure you want to delete ${m.title}?',
+                                onConfirm: () => provider.deleteMinutes(m),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
   }
 
-  void _showMeetingMinutesDialog(BuildContext context, {MeetingMinutesModel? minute}) {
+  void _showMeetingMinutesDialog(
+    BuildContext context, {
+    MeetingMinutesModel? minute,
+  }) {
     final formKey = GlobalKey<FormState>();
     final titleCtrl = TextEditingController(text: minute?.title ?? '');
     final dateCtrl = TextEditingController(text: minute?.date ?? '');
@@ -2237,18 +4057,27 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     Uint8List? pdfBytes;
     bool isSaving = false;
     String selectedSection = minute?.section ?? 'all';
-    if (selectedSection == 'all' && minute != null && minute.zone.isNotEmpty && minute.zone.toLowerCase() != 'all' && minute.zone.toLowerCase() != 'state' && minute.zone.toLowerCase() != 'executive' && minute.zone.toLowerCase() != 'executive committee') {
+    if (selectedSection == 'all' &&
+        minute != null &&
+        minute.zone.isNotEmpty &&
+        minute.zone.toLowerCase() != 'all' &&
+        minute.zone.toLowerCase() != 'state' &&
+        minute.zone.toLowerCase() != 'executive' &&
+        minute.zone.toLowerCase() != 'executive committee') {
       selectedSection = 'zonal';
     }
     final zonesList = context.read<AdminProvider>().zones;
     String? selectedZone = minute?.zone;
-    if (selectedZone == null && zonesList.isNotEmpty) selectedZone = zonesList.first;
+    if (selectedZone == null && zonesList.isNotEmpty)
+      selectedZone = zonesList.first;
 
     showDialog(
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(minute == null ? 'Publish Meeting Minutes' : 'Update Minutes'),
+          title: Text(
+            minute == null ? 'Publish Meeting Minutes' : 'Update Minutes',
+          ),
           content: SingleChildScrollView(
             child: Form(
               key: formKey,
@@ -2258,7 +4087,8 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   TextFormField(
                     controller: titleCtrl,
                     decoration: const InputDecoration(labelText: 'Title *'),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                     enabled: !isSaving,
                   ),
                   const SizedBox(height: 12),
@@ -2268,29 +4098,59 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                     items: const [
                       DropdownMenuItem(value: 'all', child: Text('All')),
                       DropdownMenuItem(value: 'state', child: Text('State')),
-                      DropdownMenuItem(value: 'executive', child: Text('Executive')),
+                      DropdownMenuItem(
+                        value: 'executive',
+                        child: Text('Executive'),
+                      ),
                       DropdownMenuItem(value: 'zonal', child: Text('Zonal')),
                     ],
-                    onChanged: isSaving ? null : (val) => setDialogState(() => selectedSection = val!),
+                    onChanged: isSaving
+                        ? null
+                        : (val) => setDialogState(() => selectedSection = val!),
                   ),
                   if (selectedSection == 'zonal') ...[
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: selectedZone != null && zonesList.any((z) => z.toLowerCase() == selectedZone?.toLowerCase())
-                          ? zonesList.firstWhere((z) => z.toLowerCase() == selectedZone?.toLowerCase())
+                      value:
+                          selectedZone != null &&
+                              zonesList.any(
+                                (z) =>
+                                    z.toLowerCase() ==
+                                    selectedZone?.toLowerCase(),
+                              )
+                          ? zonesList.firstWhere(
+                              (z) =>
+                                  z.toLowerCase() ==
+                                  selectedZone?.toLowerCase(),
+                            )
                           : (zonesList.isNotEmpty ? zonesList.first : null),
-                      decoration: const InputDecoration(labelText: 'Select Zone *'),
-                      items: zonesList.map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
-                      onChanged: isSaving ? null : (val) => setDialogState(() => selectedZone = val),
-                      validator: (v) => selectedSection == 'zonal' && (v == null || v.isEmpty) ? 'Required' : null,
+                      decoration: const InputDecoration(
+                        labelText: 'Select Zone *',
+                      ),
+                      items: zonesList
+                          .map(
+                            (z) => DropdownMenuItem(value: z, child: Text(z)),
+                          )
+                          .toList(),
+                      onChanged: isSaving
+                          ? null
+                          : (val) => setDialogState(() => selectedZone = val),
+                      validator: (v) =>
+                          selectedSection == 'zonal' && (v == null || v.isEmpty)
+                          ? 'Required'
+                          : null,
                     ),
                   ],
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: dateCtrl,
                     readOnly: true,
-                    decoration: const InputDecoration(labelText: 'Meeting Date *', suffixIcon: Icon(Icons.calendar_today)),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Meeting Date *',
+                      suffixIcon: Icon(Icons.calendar_today),
+                    ),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                     onTap: isSaving
                         ? null
                         : () async {
@@ -2302,7 +4162,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                             );
                             if (picked != null) {
                               setDialogState(() {
-                                dateCtrl.text = DateFormat('yyyy-MM-dd').format(picked);
+                                dateCtrl.text = DateFormat(
+                                  'yyyy-MM-dd',
+                                ).format(picked);
                               });
                             }
                           },
@@ -2325,63 +4187,94 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   ),
                   if (pdfName.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    Text('Selected: $pdfName', style: const TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.bold)),
+                    Text(
+                      'Selected: $pdfName',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.green,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ],
               ),
             ),
           ),
           actions: [
-            TextButton(onPressed: isSaving ? null : () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: isSaving ? null : () => Navigator.pop(dialogCtx),
+              child: const Text('Cancel'),
+            ),
             ElevatedButton(
               onPressed: isSaving
                   ? null
                   : () async {
                       if (formKey.currentState!.validate()) {
                         if (minute == null && pdfBytes == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a PDF file.')));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please select a PDF file.'),
+                            ),
+                          );
                           return;
                         }
 
                         setDialogState(() => isSaving = true);
                         try {
                           final newMinute = MeetingMinutesModel(
-                            id: minute?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                            id:
+                                minute?.id ??
+                                DateTime.now().millisecondsSinceEpoch
+                                    .toString(),
                             title: titleCtrl.text.trim(),
                             date: dateCtrl.text.trim(),
                             section: selectedSection,
                             zone: selectedSection == 'zonal'
                                 ? (selectedZone ?? '')
                                 : (selectedSection == 'state'
-                                    ? 'State'
-                                    : (selectedSection == 'executive' ? 'Executive Committee' : 'All')),
+                                      ? 'State'
+                                      : (selectedSection == 'executive'
+                                            ? 'Executive Committee'
+                                            : 'All')),
                             pdfName: pdfName,
                             pdfUrl: minute?.pdfUrl ?? '',
                             status: minute?.status ?? 'approved',
-                            createdAt: minute?.createdAt ?? DateTime.now().toIso8601String(),
+                            createdAt:
+                                minute?.createdAt ??
+                                DateTime.now().toIso8601String(),
                           );
 
                           bool success;
                           if (minute == null) {
-                            success = await context.read<MeetingMinutesProvider>().addMinutes(newMinute, pdfBytes!);
+                            success = await context
+                                .read<MeetingMinutesProvider>()
+                                .addMinutes(newMinute, pdfBytes!);
                             if (success && dialogCtx.mounted) {
-                              await dialogCtx.read<NotificationProvider>().sendSystemNotification(
-                                title: 'New Meeting Minutes Published',
-                                body: newMinute.title,
-                                routingPath: AppRoutes.meetingMinutes,
-                              );
+                              await dialogCtx
+                                  .read<NotificationProvider>()
+                                  .sendSystemNotification(
+                                    title: 'New Meeting Minutes Published',
+                                    body: newMinute.title,
+                                    routingPath: AppRoutes.meetingMinutes,
+                                  );
                             }
                           } else {
-                            success = await context.read<MeetingMinutesProvider>().updateMinutes(newMinute, pdfBytes);
+                            success = await context
+                                .read<MeetingMinutesProvider>()
+                                .updateMinutes(newMinute, pdfBytes);
                           }
 
-                          if (success && dialogCtx.mounted) Navigator.pop(dialogCtx);
+                          if (success && dialogCtx.mounted)
+                            Navigator.pop(dialogCtx);
                         } finally {
-                          if (dialogCtx.mounted) setDialogState(() => isSaving = false);
+                          if (dialogCtx.mounted)
+                            setDialogState(() => isSaving = false);
                         }
                       }
                     },
-              child: isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text('Publish'),
+              child: isSaving
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text('Publish'),
             ),
           ],
         ),
@@ -2395,22 +4288,35 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
   Widget _buildMinutesApprovalsView() {
     final minutesProv = context.watch<MeetingMinutesProvider>();
-    final pendingMinutes = minutesProv.minutesList.where((m) => m.status == 'pending').toList();
+    final pendingMinutes = minutesProv.minutesList
+        .where((m) => m.status == 'pending')
+        .toList();
 
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Pending Minutes Approvals (${pendingMinutes.length})', style: AppTextStyle.headlineSm(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            'Pending Minutes Approvals (${pendingMinutes.length})',
+            style: AppTextStyle.headlineSm(
+              color: AppColors.brandSecondary,
+            ).copyWith(fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 4),
-          const Text('Review meeting minutes uploaded by zonal administrators before public release.', style: TextStyle(color: Colors.grey, fontSize: 13)),
+          const Text(
+            'Review meeting minutes uploaded by zonal administrators before public release.',
+            style: TextStyle(color: Colors.grey, fontSize: 13),
+          ),
           const SizedBox(height: AppSpacing.xl),
 
           pendingMinutes.isEmpty
               ? const Center(
                   child: Padding(
                     padding: EdgeInsets.all(32),
-                    child: Text('No pending meeting minutes awaiting approval.', style: TextStyle(color: Colors.grey)),
+                    child: Text(
+                      'No pending meeting minutes awaiting approval.',
+                      style: TextStyle(color: Colors.grey),
+                    ),
                   ),
                 )
               : ListView.builder(
@@ -2431,16 +4337,35 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                         children: [
                           Container(
                             padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: AppRadius.borderMd),
-                            child: const Icon(Icons.picture_as_pdf, color: Colors.blue, size: 24),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: AppRadius.borderMd,
+                            ),
+                            child: const Icon(
+                              Icons.picture_as_pdf,
+                              color: Colors.blue,
+                              size: 24,
+                            ),
                           ),
                           const SizedBox(width: AppSpacing.md),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(minute.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                                Text('Zone: ${minute.zone.isNotEmpty ? minute.zone : "All"} | Date: ${minute.date}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                Text(
+                                  minute.title,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                Text(
+                                  'Zone: ${minute.zone.isNotEmpty ? minute.zone : "All"} | Date: ${AppDateFormatter.formatToDateMonthYear(minute.date)}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -2463,16 +4388,31 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                           ),
                           const SizedBox(width: 8),
                           ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                            ),
                             onPressed: () async {
-                              final success = await minutesProv.updateMinutes(minute.copyWith(status: 'approved'), null);
+                              final success = await minutesProv.updateMinutes(
+                                minute.copyWith(status: 'approved'),
+                                null,
+                              );
                               if (success && context.mounted) {
-                                await context.read<NotificationProvider>().sendSystemNotification(
-                                  title: 'Meeting Minutes Approved',
-                                  body: minute.title,
-                                  routingPath: AppRoutes.meetingMinutes,
+                                await context
+                                    .read<NotificationProvider>()
+                                    .sendSystemNotification(
+                                      title: 'Meeting Minutes Approved',
+                                      body: minute.title,
+                                      routingPath: AppRoutes.meetingMinutes,
+                                    );
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Minutes approved and published!',
+                                    ),
+                                    backgroundColor: Colors.green,
+                                  ),
                                 );
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Minutes approved and published!'), backgroundColor: Colors.green));
                               }
                             },
                             icon: const Icon(Icons.check, size: 16),
@@ -2499,7 +4439,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
@@ -2507,9 +4450,18 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Government Orders (GO) (${orders.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text(
+                'Government Orders (GO) (${orders.length})',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
               ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.brandPrimary, foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brandPrimary,
+                  foregroundColor: Colors.white,
+                ),
                 onPressed: () => _showGovernmentOrderDialog(context),
                 icon: const Icon(Icons.upload_file, size: 18),
                 label: const Text('Add GO PDF'),
@@ -2519,73 +4471,100 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         ),
         Expanded(
           child: provider.isLoading
-              ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.brandPrimary,
+                  ),
+                )
               : orders.isEmpty
-                  ? const Center(child: Text('No Government Orders found.'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(AppSpacing.lg),
-                      itemCount: orders.length,
-                      itemBuilder: (context, index) {
-                        final o = orders[index];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: AppSpacing.md),
+              ? const Center(child: Text('No Government Orders found.'))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  itemCount: orders.length,
+                  itemBuilder: (context, index) {
+                    final o = orders[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: AppRadius.borderMd,
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: Colors.orange.shade50,
                             borderRadius: AppRadius.borderMd,
-                            border: Border.all(color: Colors.grey.shade200),
                           ),
-                          child: ListTile(
-                            leading: Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: AppRadius.borderMd),
-                              child: const Icon(Icons.gavel, color: Colors.orange, size: 24),
-                            ),
-                            title: Text(o.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text('Order No: ${o.orderNumber} | Date: ${o.date} | Section: ${o.section.toUpperCase()}'),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.visibility, color: Colors.green),
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => AppPdfViewerScreen(
-                                          title: o.title,
-                                          pdfUrl: o.pdfUrl,
-                                          folderName: 'government_orders',
-                                          docId: o.id,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.edit, color: Colors.blue),
-                                  onPressed: () => _showGovernmentOrderDialog(context, order: o),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: AppColors.error),
-                                  onPressed: () => _confirmDelete(
-                                    context,
-                                    title: 'Delete Order',
-                                    content: 'Are you sure you want to delete ${o.title}?',
-                                    onConfirm: () => provider.deleteOrder(o),
+                          child: const Icon(
+                            Icons.gavel,
+                            color: Colors.orange,
+                            size: 24,
+                          ),
+                        ),
+                        title: Text(
+                          o.title,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          'Order No: ${o.orderNumber} | Date: ${AppDateFormatter.formatToDateMonthYear(o.date)} | Section: ${o.section.toUpperCase()}',
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.visibility,
+                                color: Colors.green,
+                              ),
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => AppPdfViewerScreen(
+                                      title: o.title,
+                                      pdfUrl: o.pdfUrl,
+                                      folderName: 'government_orders',
+                                      docId: o.id,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                );
+                              },
                             ),
-                          ),
-                        );
-                      },
-                    ),
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () =>
+                                  _showGovernmentOrderDialog(context, order: o),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete,
+                                color: AppColors.error,
+                              ),
+                              onPressed: () => _confirmDelete(
+                                context,
+                                title: 'Delete Order',
+                                content:
+                                    'Are you sure you want to delete ${o.title}?',
+                                onConfirm: () => provider.deleteOrder(o),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
   }
 
-  void _showGovernmentOrderDialog(BuildContext context, {GovernmentOrderModel? order}) {
+  void _showGovernmentOrderDialog(
+    BuildContext context, {
+    GovernmentOrderModel? order,
+  }) {
     final formKey = GlobalKey<FormState>();
     final titleCtrl = TextEditingController(text: order?.title ?? '');
     final numCtrl = TextEditingController(text: order?.orderNumber ?? '');
@@ -2601,7 +4580,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(order == null ? 'Add Government Order' : 'Update Government Order'),
+          title: Text(
+            order == null ? 'Add Government Order' : 'Update Government Order',
+          ),
           content: SingleChildScrollView(
             child: Form(
               key: formKey,
@@ -2611,7 +4592,8 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   TextFormField(
                     controller: titleCtrl,
                     decoration: const InputDecoration(labelText: 'Title *'),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                     enabled: !isSaving,
                   ),
                   const SizedBox(height: 12),
@@ -2621,36 +4603,68 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                     items: const [
                       DropdownMenuItem(value: 'all', child: Text('All')),
                       DropdownMenuItem(value: 'state', child: Text('State')),
-                      DropdownMenuItem(value: 'executive', child: Text('Executive')),
+                      DropdownMenuItem(
+                        value: 'executive',
+                        child: Text('Executive'),
+                      ),
                       DropdownMenuItem(value: 'zonal', child: Text('Zonal')),
                     ],
-                    onChanged: isSaving ? null : (val) => setDialogState(() => selectedSection = val!),
+                    onChanged: isSaving
+                        ? null
+                        : (val) => setDialogState(() => selectedSection = val!),
                   ),
                   if (selectedSection == 'zonal') ...[
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: selectedZone.isNotEmpty && zonesList.any((z) => z.toLowerCase() == selectedZone.toLowerCase())
-                          ? zonesList.firstWhere((z) => z.toLowerCase() == selectedZone.toLowerCase())
+                      value:
+                          selectedZone.isNotEmpty &&
+                              zonesList.any(
+                                (z) =>
+                                    z.toLowerCase() ==
+                                    selectedZone.toLowerCase(),
+                              )
+                          ? zonesList.firstWhere(
+                              (z) =>
+                                  z.toLowerCase() == selectedZone.toLowerCase(),
+                            )
                           : (zonesList.isNotEmpty ? zonesList.first : null),
-                      decoration: const InputDecoration(labelText: 'Select Zone *'),
-                      items: zonesList.map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
-                      onChanged: isSaving ? null : (val) => setDialogState(() => selectedZone = val!),
-                      validator: (v) => selectedSection == 'zonal' && (v == null || v.isEmpty) ? 'Required' : null,
+                      decoration: const InputDecoration(
+                        labelText: 'Select Zone *',
+                      ),
+                      items: zonesList
+                          .map(
+                            (z) => DropdownMenuItem(value: z, child: Text(z)),
+                          )
+                          .toList(),
+                      onChanged: isSaving
+                          ? null
+                          : (val) => setDialogState(() => selectedZone = val!),
+                      validator: (v) =>
+                          selectedSection == 'zonal' && (v == null || v.isEmpty)
+                          ? 'Required'
+                          : null,
                     ),
                   ],
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: numCtrl,
-                    decoration: const InputDecoration(labelText: 'Order Number *'),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Order Number *',
+                    ),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                     enabled: !isSaving,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: dateCtrl,
                     readOnly: true,
-                    decoration: const InputDecoration(labelText: 'Order Date *', suffixIcon: Icon(Icons.calendar_today)),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Order Date *',
+                      suffixIcon: Icon(Icons.calendar_today),
+                    ),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                     onTap: isSaving
                         ? null
                         : () async {
@@ -2661,7 +4675,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                               lastDate: DateTime(2100),
                             );
                             if (picked != null) {
-                              setDialogState(() => dateCtrl.text = DateFormat('yyyy-MM-dd').format(picked));
+                              setDialogState(
+                                () => dateCtrl.text = DateFormat(
+                                  'yyyy-MM-dd',
+                                ).format(picked),
+                              );
                             }
                           },
                   ),
@@ -2683,59 +4701,90 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   ),
                   if (pdfName.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    Text('Selected: $pdfName', style: const TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.bold)),
+                    Text(
+                      'Selected: $pdfName',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.green,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ],
               ),
             ),
           ),
           actions: [
-            TextButton(onPressed: isSaving ? null : () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: isSaving ? null : () => Navigator.pop(dialogCtx),
+              child: const Text('Cancel'),
+            ),
             ElevatedButton(
               onPressed: isSaving
                   ? null
                   : () async {
                       if (formKey.currentState!.validate()) {
                         if (order == null && pdfBytes == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a PDF file.')));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please select a PDF file.'),
+                            ),
+                          );
                           return;
                         }
 
                         setDialogState(() => isSaving = true);
                         try {
                           final newOrder = GovernmentOrderModel(
-                            id: order?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                            id:
+                                order?.id ??
+                                DateTime.now().millisecondsSinceEpoch
+                                    .toString(),
                             title: titleCtrl.text.trim(),
                             orderNumber: numCtrl.text.trim(),
                             date: dateCtrl.text.trim(),
                             pdfName: pdfName,
                             pdfUrl: order?.pdfUrl ?? '',
-                            createdAt: order?.createdAt ?? DateTime.now().toIso8601String(),
+                            createdAt:
+                                order?.createdAt ??
+                                DateTime.now().toIso8601String(),
                             section: selectedSection,
-                            zone: selectedSection == 'zonal' ? selectedZone : '',
+                            zone: selectedSection == 'zonal'
+                                ? selectedZone
+                                : '',
                           );
 
                           bool success;
                           if (order == null) {
-                            success = await context.read<GovernmentOrdersProvider>().addOrder(newOrder, pdfBytes!);
+                            success = await context
+                                .read<GovernmentOrdersProvider>()
+                                .addOrder(newOrder, pdfBytes!);
                             if (success && dialogCtx.mounted) {
-                              await dialogCtx.read<NotificationProvider>().sendSystemNotification(
-                                title: 'New Government Order',
-                                body: newOrder.title,
-                                routingPath: AppRoutes.governmentOrders,
-                              );
+                              await dialogCtx
+                                  .read<NotificationProvider>()
+                                  .sendSystemNotification(
+                                    title: 'New Government Order',
+                                    body: newOrder.title,
+                                    routingPath: AppRoutes.governmentOrders,
+                                  );
                             }
                           } else {
-                            success = await context.read<GovernmentOrdersProvider>().updateOrder(newOrder, pdfBytes);
+                            success = await context
+                                .read<GovernmentOrdersProvider>()
+                                .updateOrder(newOrder, pdfBytes);
                           }
 
-                          if (success && dialogCtx.mounted) Navigator.pop(dialogCtx);
+                          if (success && dialogCtx.mounted)
+                            Navigator.pop(dialogCtx);
                         } finally {
-                          if (dialogCtx.mounted) setDialogState(() => isSaving = false);
+                          if (dialogCtx.mounted)
+                            setDialogState(() => isSaving = false);
                         }
                       }
                     },
-              child: isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text('Save'),
+              child: isSaving
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text('Save'),
             ),
           ],
         ),
@@ -2754,7 +4803,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
@@ -2762,9 +4814,18 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Forms & Circulars (${forms.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text(
+                'Forms & Circulars (${forms.length})',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
               ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.brandPrimary, foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brandPrimary,
+                  foregroundColor: Colors.white,
+                ),
                 onPressed: () => _showFormCircularDialog(context),
                 icon: const Icon(Icons.upload_file, size: 18),
                 label: const Text('Add Form PDF'),
@@ -2774,73 +4835,100 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         ),
         Expanded(
           child: provider.isLoading
-              ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.brandPrimary,
+                  ),
+                )
               : forms.isEmpty
-                  ? const Center(child: Text('No Forms or Circulars found.'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(AppSpacing.lg),
-                      itemCount: forms.length,
-                      itemBuilder: (context, index) {
-                        final f = forms[index];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: AppSpacing.md),
+              ? const Center(child: Text('No Forms or Circulars found.'))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  itemCount: forms.length,
+                  itemBuilder: (context, index) {
+                    final f = forms[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: AppRadius.borderMd,
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: Colors.purple.shade50,
                             borderRadius: AppRadius.borderMd,
-                            border: Border.all(color: Colors.grey.shade200),
                           ),
-                          child: ListTile(
-                            leading: Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(color: Colors.purple.shade50, borderRadius: AppRadius.borderMd),
-                              child: const Icon(Icons.folder_zip, color: Colors.purple, size: 24),
-                            ),
-                            title: Text(f.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text('Circular No: ${f.circularNumber ?? "N/A"} | Date: ${f.date}'),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.visibility, color: Colors.green),
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => AppPdfViewerScreen(
-                                          title: f.title,
-                                          pdfUrl: f.pdfUrl,
-                                          folderName: 'forms_circulars',
-                                          docId: f.id,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.edit, color: Colors.blue),
-                                  onPressed: () => _showFormCircularDialog(context, form: f),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: AppColors.error),
-                                  onPressed: () => _confirmDelete(
-                                    context,
-                                    title: 'Delete Form/Circular',
-                                    content: 'Are you sure you want to delete ${f.title}?',
-                                    onConfirm: () => provider.deleteForm(f),
+                          child: const Icon(
+                            Icons.folder_zip,
+                            color: Colors.purple,
+                            size: 24,
+                          ),
+                        ),
+                        title: Text(
+                          f.title,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          'Circular No: ${f.circularNumber ?? "N/A"} | Date: ${AppDateFormatter.formatToDateMonthYear(f.date)}',
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.visibility,
+                                color: Colors.green,
+                              ),
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => AppPdfViewerScreen(
+                                      title: f.title,
+                                      pdfUrl: f.pdfUrl,
+                                      folderName: 'forms_circulars',
+                                      docId: f.id,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                );
+                              },
                             ),
-                          ),
-                        );
-                      },
-                    ),
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () =>
+                                  _showFormCircularDialog(context, form: f),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete,
+                                color: AppColors.error,
+                              ),
+                              onPressed: () => _confirmDelete(
+                                context,
+                                title: 'Delete Form/Circular',
+                                content:
+                                    'Are you sure you want to delete ${f.title}?',
+                                onConfirm: () => provider.deleteForm(f),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
   }
 
-  void _showFormCircularDialog(BuildContext context, {FormCircularModel? form}) {
+  void _showFormCircularDialog(
+    BuildContext context, {
+    FormCircularModel? form,
+  }) {
     final formKey = GlobalKey<FormState>();
     final titleCtrl = TextEditingController(text: form?.title ?? '');
     final numCtrl = TextEditingController(text: form?.circularNumber ?? '');
@@ -2854,7 +4942,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(form == null ? 'Add Form/Circular' : 'Update Form/Circular'),
+          title: Text(
+            form == null ? 'Add Form/Circular' : 'Update Form/Circular',
+          ),
           content: SingleChildScrollView(
             child: Form(
               key: formKey,
@@ -2864,27 +4954,36 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   TextFormField(
                     controller: titleCtrl,
                     decoration: const InputDecoration(labelText: 'Title *'),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                     enabled: !isSaving,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: numCtrl,
-                    decoration: const InputDecoration(labelText: 'Circular Number (Optional)'),
+                    decoration: const InputDecoration(
+                      labelText: 'Circular Number (Optional)',
+                    ),
                     enabled: !isSaving,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: urlCtrl,
-                    decoration: const InputDecoration(labelText: 'External URL (Optional)'),
+                    decoration: const InputDecoration(
+                      labelText: 'External URL (Optional)',
+                    ),
                     enabled: !isSaving,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: dateCtrl,
                     readOnly: true,
-                    decoration: const InputDecoration(labelText: 'Publish Date *', suffixIcon: Icon(Icons.calendar_today)),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Publish Date *',
+                      suffixIcon: Icon(Icons.calendar_today),
+                    ),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                     onTap: isSaving
                         ? null
                         : () async {
@@ -2896,7 +4995,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                             );
                             if (picked != null) {
                               setDialogState(() {
-                                dateCtrl.text = DateFormat('yyyy-MM-dd').format(picked);
+                                dateCtrl.text = DateFormat(
+                                  'yyyy-MM-dd',
+                                ).format(picked);
                               });
                             }
                           },
@@ -2919,58 +5020,102 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   ),
                   if (pdfName.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    Text('Selected: $pdfName', style: const TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.bold)),
+                    Text(
+                      'Selected: $pdfName',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.green,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ],
               ),
             ),
           ),
           actions: [
-            TextButton(onPressed: isSaving ? null : () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: isSaving ? null : () => Navigator.pop(dialogCtx),
+              child: const Text('Cancel'),
+            ),
             ElevatedButton(
               onPressed: isSaving
                   ? null
                   : () async {
                       if (formKey.currentState!.validate()) {
-                        if (form == null && pdfBytes == null && urlCtrl.text.trim().isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a PDF file or enter an external URL.')));
+                        if (form == null &&
+                            pdfBytes == null &&
+                            urlCtrl.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Please select a PDF file or enter an external URL.',
+                              ),
+                            ),
+                          );
                           return;
                         }
 
                         setDialogState(() => isSaving = true);
                         try {
                           final newForm = FormCircularModel(
-                            id: form?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                            id:
+                                form?.id ??
+                                DateTime.now().millisecondsSinceEpoch
+                                    .toString(),
                             title: titleCtrl.text.trim(),
-                            circularNumber: numCtrl.text.trim().isEmpty ? null : numCtrl.text.trim(),
+                            circularNumber: numCtrl.text.trim().isEmpty
+                                ? null
+                                : numCtrl.text.trim(),
                             date: dateCtrl.text.trim(),
                             pdfName: pdfName,
                             pdfUrl: form?.pdfUrl ?? '',
-                            externalUrl: urlCtrl.text.trim().isEmpty ? null : urlCtrl.text.trim(),
-                            createdAt: form?.createdAt ?? DateTime.now().toIso8601String(),
+                            externalUrl: urlCtrl.text.trim().isEmpty
+                                ? null
+                                : urlCtrl.text.trim(),
+                            createdAt:
+                                form?.createdAt ??
+                                DateTime.now().toIso8601String(),
                           );
 
                           bool success;
                           if (form == null) {
-                            success = await context.read<FormsCircularsProvider>().addForm(newForm, pdfBytes);
+                            success = await context
+                                .read<FormsCircularsProvider>()
+                                .addForm(newForm, pdfBytes);
                             if (success && dialogCtx.mounted) {
-                              await dialogCtx.read<NotificationProvider>().sendSystemNotification(
-                                title: 'New Form or Circular',
-                                body: newForm.title,
-                                routingPath: AppRoutes.formsCirculars,
-                              );
+                              await dialogCtx
+                                  .read<NotificationProvider>()
+                                  .sendSystemNotification(
+                                    title: 'New Form or Circular',
+                                    body: newForm.title,
+                                    routingPath: AppRoutes.formsCirculars,
+                                  );
                             }
                           } else {
-                            success = await context.read<FormsCircularsProvider>().updateForm(newForm, pdfBytes);
+                            success = await context
+                                .read<FormsCircularsProvider>()
+                                .updateForm(newForm, pdfBytes);
                           }
 
-                          if (success && dialogCtx.mounted) Navigator.pop(dialogCtx);
+                          if (success && dialogCtx.mounted)
+                            Navigator.pop(dialogCtx);
                         } finally {
-                          if (dialogCtx.mounted) setDialogState(() => isSaving = false);
+                          if (dialogCtx.mounted)
+                            setDialogState(() => isSaving = false);
                         }
                       }
                     },
-              child: isSaving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Save'),
+              child: isSaving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Save'),
             ),
           ],
         ),
@@ -2989,7 +5134,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
@@ -2997,9 +5145,18 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Updates & Announcements (${updates.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text(
+                'Updates & Announcements (${updates.length})',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
               ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.brandPrimary, foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brandPrimary,
+                  foregroundColor: Colors.white,
+                ),
                 onPressed: () => _showUpdateDialog(context),
                 icon: const Icon(Icons.add_alert, size: 18),
                 label: const Text('New Update'),
@@ -3009,52 +5166,73 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         ),
         Expanded(
           child: provider.isLoading
-              ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.brandPrimary,
+                  ),
+                )
               : updates.isEmpty
-                  ? const Center(child: Text('No announcements found.'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(AppSpacing.lg),
-                      itemCount: updates.length,
-                      itemBuilder: (context, index) {
-                        final u = updates[index];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: AppSpacing.md),
+              ? const Center(child: Text('No announcements found.'))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  itemCount: updates.length,
+                  itemBuilder: (context, index) {
+                    final u = updates[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: AppRadius.borderMd,
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: Colors.teal.shade50,
                             borderRadius: AppRadius.borderMd,
-                            border: Border.all(color: Colors.grey.shade200),
                           ),
-                          child: ListTile(
-                            leading: Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(color: Colors.teal.shade50, borderRadius: AppRadius.borderMd),
-                              child: const Icon(Icons.campaign, color: Colors.teal, size: 24),
-                            ),
-                            title: Text(u.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text('Date: ${u.date} | Content: ${u.content.length > 60 ? "${u.content.substring(0, 60)}..." : u.content}'),
-                            isThreeLine: true,
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit, color: Colors.blue),
-                                  onPressed: () => _showUpdateDialog(context, update: u),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: AppColors.error),
-                                  onPressed: () => _confirmDelete(
-                                    context,
-                                    title: 'Delete Update',
-                                    content: 'Are you sure you want to delete ${u.title}?',
-                                    onConfirm: () => provider.deleteUpdate(u.id),
-                                  ),
-                                ),
-                              ],
-                            ),
+                          child: const Icon(
+                            Icons.campaign,
+                            color: Colors.teal,
+                            size: 24,
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                        title: Text(
+                          u.title,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          'Date: ${AppDateFormatter.formatToDateMonthYear(u.date)} | Content: ${u.content.length > 60 ? "${u.content.substring(0, 60)}..." : u.content}',
+                        ),
+                        isThreeLine: true,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () =>
+                                  _showUpdateDialog(context, update: u),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete,
+                                color: AppColors.error,
+                              ),
+                              onPressed: () => _confirmDelete(
+                                context,
+                                title: 'Delete Update',
+                                content:
+                                    'Are you sure you want to delete ${u.title}?',
+                                onConfirm: () => provider.deleteUpdate(u.id),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -3080,14 +5258,19 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   TextFormField(
                     controller: titleCtrl,
                     decoration: const InputDecoration(labelText: 'Title *'),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: dateCtrl,
                     readOnly: true,
-                    decoration: const InputDecoration(labelText: 'Date *', suffixIcon: Icon(Icons.calendar_today)),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Date *',
+                      suffixIcon: Icon(Icons.calendar_today),
+                    ),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                     onTap: () async {
                       final picked = await showDatePicker(
                         context: context,
@@ -3097,7 +5280,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                       );
                       if (picked != null) {
                         setDialogState(() {
-                          dateCtrl.text = DateFormat('yyyy-MM-dd').format(picked);
+                          dateCtrl.text = DateFormat(
+                            'yyyy-MM-dd',
+                          ).format(picked);
                         });
                       }
                     },
@@ -3107,37 +5292,50 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                     controller: contentCtrl,
                     maxLines: 4,
                     decoration: const InputDecoration(labelText: 'Content *'),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                   ),
                 ],
               ),
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Cancel'),
+            ),
             ElevatedButton(
               onPressed: () async {
                 if (formKey.currentState!.validate()) {
                   final newUpdate = UpdateModel(
-                    id: update?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                    id:
+                        update?.id ??
+                        DateTime.now().millisecondsSinceEpoch.toString(),
                     title: titleCtrl.text.trim(),
                     content: contentCtrl.text.trim(),
                     date: dateCtrl.text.trim(),
-                    createdAt: update?.createdAt ?? DateTime.now().toIso8601String(),
+                    createdAt:
+                        update?.createdAt ?? DateTime.now().toIso8601String(),
                   );
 
                   bool success;
                   if (update == null) {
-                    success = await context.read<UpdatesProvider>().addUpdate(newUpdate);
+                    success = await context.read<UpdatesProvider>().addUpdate(
+                      newUpdate,
+                    );
                     if (success && dialogCtx.mounted) {
-                      await dialogCtx.read<NotificationProvider>().sendSystemNotification(
-                        title: 'New Announcement',
-                        body: newUpdate.title,
-                        routingPath: AppRoutes.updates,
-                      );
+                      await dialogCtx
+                          .read<NotificationProvider>()
+                          .sendSystemNotification(
+                            title: 'New Announcement',
+                            body: newUpdate.title,
+                            routingPath: AppRoutes.updates,
+                          );
                     }
                   } else {
-                    success = await context.read<UpdatesProvider>().updateUpdate(newUpdate);
+                    success = await context
+                        .read<UpdatesProvider>()
+                        .updateUpdate(newUpdate);
                   }
 
                   if (success && dialogCtx.mounted) Navigator.pop(dialogCtx);
@@ -3162,7 +5360,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
@@ -3170,9 +5371,18 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Live Sessions (${sessions.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text(
+                'Live Sessions (${sessions.length})',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
               ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.brandPrimary, foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brandPrimary,
+                  foregroundColor: Colors.white,
+                ),
                 onPressed: () => _showLiveSessionDialog(context),
                 icon: const Icon(Icons.add_link, size: 18),
                 label: const Text('Schedule Session'),
@@ -3182,58 +5392,83 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         ),
         Expanded(
           child: provider.isLoading
-              ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.brandPrimary,
+                  ),
+                )
               : sessions.isEmpty
-                  ? const Center(child: Text('No active live sessions.'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(AppSpacing.lg),
-                      itemCount: sessions.length,
-                      itemBuilder: (context, index) {
-                        final s = sessions[index];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: AppSpacing.md),
+              ? const Center(child: Text('No active live sessions.'))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  itemCount: sessions.length,
+                  itemBuilder: (context, index) {
+                    final s = sessions[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: AppRadius.borderMd,
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: Colors.red.shade50,
                             borderRadius: AppRadius.borderMd,
-                            border: Border.all(color: Colors.grey.shade200),
                           ),
-                          child: ListTile(
-                            leading: Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: AppRadius.borderMd),
-                              child: const Icon(Icons.live_tv, color: Colors.red, size: 24),
-                            ),
-                            title: Text(s.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text('Date: ${s.date}\nURL: ${s.url}'),
-                            isThreeLine: true,
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit, color: Colors.blue),
-                                  onPressed: () => _showLiveSessionDialog(context, session: s),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: AppColors.error),
-                                  onPressed: () => _confirmDelete(
-                                    context,
-                                    title: 'Delete Session',
-                                    content: 'Are you sure you want to remove session ${s.title}?',
-                                    onConfirm: () => provider.deleteLiveSession(s.id),
-                                  ),
-                                ),
-                              ],
-                            ),
+                          child: const Icon(
+                            Icons.live_tv,
+                            color: Colors.red,
+                            size: 24,
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                        title: Text(
+                          s.title,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          'Date: ${AppDateFormatter.formatToDateMonthYear(s.date)}\nURL: ${s.url}',
+                        ),
+                        isThreeLine: true,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () =>
+                                  _showLiveSessionDialog(context, session: s),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete,
+                                color: AppColors.error,
+                              ),
+                              onPressed: () => _confirmDelete(
+                                context,
+                                title: 'Delete Session',
+                                content:
+                                    'Are you sure you want to remove session ${s.title}?',
+                                onConfirm: () =>
+                                    provider.deleteLiveSession(s.id),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
   }
 
-  void _showLiveSessionDialog(BuildContext context, {LiveSessionModel? session}) {
+  void _showLiveSessionDialog(
+    BuildContext context, {
+    LiveSessionModel? session,
+  }) {
     final formKey = GlobalKey<FormState>();
     final titleCtrl = TextEditingController(text: session?.title ?? '');
     final descCtrl = TextEditingController(text: session?.description ?? '');
@@ -3244,7 +5479,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(session == null ? 'Schedule Live Session' : 'Edit Live Session'),
+          title: Text(
+            session == null ? 'Schedule Live Session' : 'Edit Live Session',
+          ),
           content: SingleChildScrollView(
             child: Form(
               key: formKey,
@@ -3254,14 +5491,19 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   TextFormField(
                     controller: titleCtrl,
                     decoration: const InputDecoration(labelText: 'Title *'),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: dateCtrl,
                     readOnly: true,
-                    decoration: const InputDecoration(labelText: 'Scheduled Date *', suffixIcon: Icon(Icons.calendar_today)),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Scheduled Date *',
+                      suffixIcon: Icon(Icons.calendar_today),
+                    ),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                     onTap: () async {
                       final picked = await showDatePicker(
                         context: context,
@@ -3271,7 +5513,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                       );
                       if (picked != null) {
                         setDialogState(() {
-                          dateCtrl.text = DateFormat('yyyy-MM-dd').format(picked);
+                          dateCtrl.text = DateFormat(
+                            'yyyy-MM-dd',
+                          ).format(picked);
                         });
                       }
                     },
@@ -3279,45 +5523,62 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: urlCtrl,
-                    decoration: const InputDecoration(labelText: 'Live Session URL *'),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Live Session URL *',
+                    ),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: descCtrl,
                     maxLines: 3,
-                    decoration: const InputDecoration(labelText: 'Description (Optional)'),
+                    decoration: const InputDecoration(
+                      labelText: 'Description (Optional)',
+                    ),
                   ),
                 ],
               ),
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Cancel'),
+            ),
             ElevatedButton(
               onPressed: () async {
                 if (formKey.currentState!.validate()) {
                   final newSession = LiveSessionModel(
-                    id: session?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                    id:
+                        session?.id ??
+                        DateTime.now().millisecondsSinceEpoch.toString(),
                     title: titleCtrl.text.trim(),
                     description: descCtrl.text.trim(),
                     url: urlCtrl.text.trim(),
                     date: dateCtrl.text.trim(),
-                    createdAt: session?.createdAt ?? DateTime.now().toIso8601String(),
+                    createdAt:
+                        session?.createdAt ?? DateTime.now().toIso8601String(),
                   );
 
                   bool success;
                   if (session == null) {
-                    success = await context.read<LiveSessionProvider>().addLiveSession(newSession);
+                    success = await context
+                        .read<LiveSessionProvider>()
+                        .addLiveSession(newSession);
                     if (success && dialogCtx.mounted) {
-                      await dialogCtx.read<NotificationProvider>().sendSystemNotification(
-                        title: 'Live Session Scheduled',
-                        body: newSession.title,
-                        routingPath: AppRoutes.liveSessions,
-                      );
+                      await dialogCtx
+                          .read<NotificationProvider>()
+                          .sendSystemNotification(
+                            title: 'Live Session Scheduled',
+                            body: newSession.title,
+                            routingPath: AppRoutes.liveSessions,
+                          );
                     }
                   } else {
-                    success = await context.read<LiveSessionProvider>().updateLiveSession(newSession);
+                    success = await context
+                        .read<LiveSessionProvider>()
+                        .updateLiveSession(newSession);
                   }
 
                   if (success && dialogCtx.mounted) Navigator.pop(dialogCtx);
@@ -3342,7 +5603,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
@@ -3350,9 +5614,18 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Photo Gallery (${images.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text(
+                'Photo Gallery (${images.length})',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
               ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.brandPrimary, foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brandPrimary,
+                  foregroundColor: Colors.white,
+                ),
                 onPressed: () => _showGalleryDialog(context),
                 icon: const Icon(Icons.add_photo_alternate, size: 18),
                 label: const Text('Upload Photo'),
@@ -3362,85 +5635,110 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         ),
         Expanded(
           child: provider.isLoading
-              ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.brandPrimary,
+                  ),
+                )
               : images.isEmpty
-                  ? const Center(child: Text('No gallery photos available.'))
-                  : GridView.builder(
-                      padding: const EdgeInsets.all(AppSpacing.lg),
-                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: 260,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        childAspectRatio: 0.85,
+              ? const Center(child: Text('No gallery photos available.'))
+              : GridView.builder(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 260,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: 0.85,
+                  ),
+                  itemCount: images.length,
+                  itemBuilder: (context, index) {
+                    final img = images[index];
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: AppRadius.borderLg,
+                        border: Border.all(color: Colors.grey.shade200),
                       ),
-                      itemCount: images.length,
-                      itemBuilder: (context, index) {
-                        final img = images[index];
-                        return Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: AppRadius.borderLg,
-                            border: Border.all(color: Colors.grey.shade200),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    Image.network(
-                                      img.imageUrl,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.broken_image)),
-                                    ),
-                                    Positioned(
-                                      top: 4,
-                                      right: 4,
-                                      child: Row(
-                                        children: [
-                                          CircleAvatar(
-                                            radius: 14,
-                                            backgroundColor: Colors.white.withValues(alpha: 0.9),
-                                            child: IconButton(
-                                              icon: const Icon(Icons.edit, size: 12, color: Colors.blue),
-                                              onPressed: () => _showGalleryDialog(context, image: img),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          CircleAvatar(
-                                            radius: 14,
-                                            backgroundColor: Colors.white.withValues(alpha: 0.9),
-                                            child: IconButton(
-                                              icon: const Icon(Icons.delete, size: 12, color: AppColors.error),
-                                              onPressed: () => _confirmDelete(
-                                                context,
-                                                title: 'Delete Photo',
-                                                content: 'Are you sure you want to remove photo ${img.title}?',
-                                                onConfirm: () => provider.deleteImage(img),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                Image.network(
+                                  img.imageUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      const Center(
+                                        child: Icon(Icons.broken_image),
                                       ),
-                                    ),
-                                  ],
                                 ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Text(
-                                  img.title,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                  overflow: TextOverflow.ellipsis,
+                                Positioned(
+                                  top: 4,
+                                  right: 4,
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 14,
+                                        backgroundColor: Colors.white
+                                            .withValues(alpha: 0.9),
+                                        child: IconButton(
+                                          icon: const Icon(
+                                            Icons.edit,
+                                            size: 12,
+                                            color: Colors.blue,
+                                          ),
+                                          onPressed: () => _showGalleryDialog(
+                                            context,
+                                            image: img,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      CircleAvatar(
+                                        radius: 14,
+                                        backgroundColor: Colors.white
+                                            .withValues(alpha: 0.9),
+                                        child: IconButton(
+                                          icon: const Icon(
+                                            Icons.delete,
+                                            size: 12,
+                                            color: AppColors.error,
+                                          ),
+                                          onPressed: () => _confirmDelete(
+                                            context,
+                                            title: 'Delete Photo',
+                                            content:
+                                                'Are you sure you want to remove photo ${img.title}?',
+                                            onConfirm: () =>
+                                                provider.deleteImage(img),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        );
-                      },
-                    ),
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Text(
+                              img.title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -3457,7 +5755,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(image == null ? 'Upload Photo to Gallery' : 'Update Gallery Photo'),
+          title: Text(
+            image == null ? 'Upload Photo to Gallery' : 'Update Gallery Photo',
+          ),
           content: SingleChildScrollView(
             child: Form(
               key: formKey,
@@ -3494,75 +5794,119 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                       child: imageBytes != null
                           ? ClipRRect(
                               borderRadius: AppRadius.borderMd,
-                              child: Image.memory(imageBytes!, fit: BoxFit.cover),
+                              child: Image.memory(
+                                imageBytes!,
+                                fit: BoxFit.cover,
+                              ),
                             )
                           : (image != null
-                              ? ClipRRect(
-                                  borderRadius: AppRadius.borderMd,
-                                  child: Image.network(
-                                    image.imageUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image),
-                                  ),
-                                )
-                              : const Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.add_a_photo, size: 36, color: Colors.grey),
-                                    SizedBox(height: 8),
-                                    Text('Tap to pick photo *', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                                  ],
-                                )),
+                                ? ClipRRect(
+                                    borderRadius: AppRadius.borderMd,
+                                    child: Image.network(
+                                      image.imageUrl,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              const Icon(Icons.broken_image),
+                                    ),
+                                  )
+                                : const Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.add_a_photo,
+                                        size: 36,
+                                        color: Colors.grey,
+                                      ),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        'Tap to pick photo *',
+                                        style: TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  )),
                     ),
                   ),
                   if (originalFileName != null) ...[
                     const SizedBox(height: 8),
-                    Text('Selected: $originalFileName', style: const TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.bold)),
+                    Text(
+                      'Selected: $originalFileName',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.green,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: titleCtrl,
-                    decoration: const InputDecoration(labelText: 'Photo Title *'),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Photo Title *',
+                    ),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                   ),
                 ],
               ),
             ),
           ),
           actions: [
-            TextButton(onPressed: isSaving ? null : () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: isSaving ? null : () => Navigator.pop(dialogCtx),
+              child: const Text('Cancel'),
+            ),
             ElevatedButton(
               onPressed: isSaving
                   ? null
                   : () async {
                       if (formKey.currentState!.validate()) {
                         if (image == null && imageBytes == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a photo.')));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please select a photo.'),
+                            ),
+                          );
                           return;
                         }
 
                         setDialogState(() => isSaving = true);
 
                         final newImage = GalleryImageModel(
-                          id: image?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                          id:
+                              image?.id ??
+                              DateTime.now().millisecondsSinceEpoch.toString(),
                           title: titleCtrl.text.trim(),
                           imageUrl: image?.imageUrl ?? '',
-                          createdAt: image?.createdAt ?? DateTime.now().toIso8601String(),
+                          createdAt:
+                              image?.createdAt ??
+                              DateTime.now().toIso8601String(),
                         );
 
                         final galleryProvider = context.read<GalleryProvider>();
                         bool success;
                         if (image == null) {
-                          success = await galleryProvider.addImage(newImage, imageBytes!);
+                          success = await galleryProvider.addImage(
+                            newImage,
+                            imageBytes!,
+                          );
                           if (success && dialogCtx.mounted) {
-                            await dialogCtx.read<NotificationProvider>().sendSystemNotification(
-                              title: 'New Gallery Photos Added',
-                              body: newImage.title,
-                              routingPath: AppRoutes.gallery,
-                            );
+                            await dialogCtx
+                                .read<NotificationProvider>()
+                                .sendSystemNotification(
+                                  title: 'New Gallery Photos Added',
+                                  body: newImage.title,
+                                  routingPath: AppRoutes.gallery,
+                                );
                           }
                         } else {
-                          success = await galleryProvider.updateImage(newImage, imageBytes);
+                          success = await galleryProvider.updateImage(
+                            newImage,
+                            imageBytes,
+                          );
                         }
 
                         if (success && dialogCtx.mounted) {
@@ -3570,7 +5914,12 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                         } else {
                           if (dialogCtx.mounted) {
                             ScaffoldMessenger.of(dialogCtx).showSnackBar(
-                              SnackBar(content: Text(galleryProvider.error ?? 'Failed to save photo.')),
+                              SnackBar(
+                                content: Text(
+                                  galleryProvider.error ??
+                                      'Failed to save photo.',
+                                ),
+                              ),
                             );
                           }
                           setDialogState(() => isSaving = false);
@@ -3578,7 +5927,14 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                       }
                     },
               child: isSaving
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                   : Text(image == null ? 'Upload' : 'Update'),
             ),
           ],
@@ -3598,7 +5954,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
@@ -3606,9 +5965,18 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Educational & Training Videos (${videos.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text(
+                'Educational & Training Videos (${videos.length})',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
               ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.brandPrimary, foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brandPrimary,
+                  foregroundColor: Colors.white,
+                ),
                 onPressed: () => _showVideoDialog(context),
                 icon: const Icon(Icons.video_call, size: 18),
                 label: const Text('Add Video'),
@@ -3618,58 +5986,86 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         ),
         Expanded(
           child: provider.isLoading
-              ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.brandPrimary,
+                  ),
+                )
               : videos.isEmpty
-                  ? const Center(child: Text('No videos in the catalog.'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(AppSpacing.lg),
-                      itemCount: videos.length,
-                      itemBuilder: (context, index) {
-                        final v = videos[index];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: AppSpacing.md),
+              ? const Center(child: Text('No videos in the catalog.'))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  itemCount: videos.length,
+                  itemBuilder: (context, index) {
+                    final v = videos[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: AppRadius.borderMd,
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: ListTile(
+                        leading: Container(
+                          width: 60,
+                          height: 45,
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: Colors.red.shade50,
                             borderRadius: AppRadius.borderMd,
-                            border: Border.all(color: Colors.grey.shade200),
                           ),
-                          child: ListTile(
-                            leading: Container(
-                              width: 60,
-                              height: 45,
-                              decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: AppRadius.borderMd),
-                              child: v.thumbnailUrl.isNotEmpty
-                                  ? ClipRRect(
-                                      borderRadius: AppRadius.borderMd,
-                                      child: Image.network(v.thumbnailUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_filled, color: Colors.red)),
-                                    )
-                                  : const Icon(Icons.play_circle_filled, color: Colors.red, size: 24),
-                            ),
-                            title: Text(v.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text('URL: ${v.videoUrl}\nDuration: ${(v.duration ~/ 60)}m ${(v.duration % 60)}s'),
-                            isThreeLine: true,
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit, color: Colors.blue),
-                                  onPressed: () => _showVideoDialog(context, video: v),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: AppColors.error),
-                                  onPressed: () => _confirmDelete(
-                                    context,
-                                    title: 'Delete Video',
-                                    content: 'Are you sure you want to remove ${v.title}?',
-                                    onConfirm: () => provider.deleteVideo(v.id),
+                          child: v.thumbnailUrl.isNotEmpty
+                              ? ClipRRect(
+                                  borderRadius: AppRadius.borderMd,
+                                  child: Image.network(
+                                    v.thumbnailUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const Icon(
+                                      Icons.play_circle_filled,
+                                      color: Colors.red,
+                                    ),
                                   ),
+                                )
+                              : const Icon(
+                                  Icons.play_circle_filled,
+                                  color: Colors.red,
+                                  size: 24,
                                 ),
-                              ],
+                        ),
+                        title: Text(
+                          v.title,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          'URL: ${v.videoUrl}\nDuration: ${(v.duration ~/ 60)}m ${(v.duration % 60)}s',
+                        ),
+                        isThreeLine: true,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () =>
+                                  _showVideoDialog(context, video: v),
                             ),
-                          ),
-                        );
-                      },
-                    ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete,
+                                color: AppColors.error,
+                              ),
+                              onPressed: () => _confirmDelete(
+                                context,
+                                title: 'Delete Video',
+                                content:
+                                    'Are you sure you want to remove ${v.title}?',
+                                onConfirm: () => provider.deleteVideo(v.id),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -3680,9 +6076,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     final titleCtrl = TextEditingController(text: video?.title ?? '');
     final descCtrl = TextEditingController(text: video?.description ?? '');
     Uint8List? videoBytes;
-    String videoName = video?.videoUrl.isNotEmpty == true ? video!.videoUrl.split('/').last.split('?').first : '';
+    String videoName = video?.videoUrl.isNotEmpty == true
+        ? video!.videoUrl.split('/').last.split('?').first
+        : '';
     Uint8List? thumbnailBytes;
-    String thumbnailName = video?.thumbnailUrl.isNotEmpty == true ? video!.thumbnailUrl.split('/').last.split('?').first : '';
+    String thumbnailName = video?.thumbnailUrl.isNotEmpty == true
+        ? video!.thumbnailUrl.split('/').last.split('?').first
+        : '';
 
     bool isSaving = false;
     double videoProgress = 0.0;
@@ -3695,7 +6095,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(video == null ? 'Upload Educational Video' : 'Edit Educational Video'),
+          title: Text(
+            video == null
+                ? 'Upload Educational Video'
+                : 'Edit Educational Video',
+          ),
           content: SingleChildScrollView(
             child: Form(
               key: formKey,
@@ -3705,7 +6109,8 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   TextFormField(
                     controller: titleCtrl,
                     decoration: const InputDecoration(labelText: 'Title *'),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
@@ -3714,21 +6119,46 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                     items: const [
                       DropdownMenuItem(value: 'all', child: Text('All')),
                       DropdownMenuItem(value: 'state', child: Text('State')),
-                      DropdownMenuItem(value: 'executive', child: Text('Executive')),
+                      DropdownMenuItem(
+                        value: 'executive',
+                        child: Text('Executive'),
+                      ),
                       DropdownMenuItem(value: 'zonal', child: Text('Zonal')),
                     ],
-                    onChanged: isSaving ? null : (val) => setDialogState(() => selectedSection = val!),
+                    onChanged: isSaving
+                        ? null
+                        : (val) => setDialogState(() => selectedSection = val!),
                   ),
                   if (selectedSection == 'zonal') ...[
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: selectedZone.isNotEmpty && zonesList.any((z) => z.toLowerCase() == selectedZone.toLowerCase())
-                          ? zonesList.firstWhere((z) => z.toLowerCase() == selectedZone.toLowerCase())
+                      value:
+                          selectedZone.isNotEmpty &&
+                              zonesList.any(
+                                (z) =>
+                                    z.toLowerCase() ==
+                                    selectedZone.toLowerCase(),
+                              )
+                          ? zonesList.firstWhere(
+                              (z) =>
+                                  z.toLowerCase() == selectedZone.toLowerCase(),
+                            )
                           : (zonesList.isNotEmpty ? zonesList.first : null),
-                      decoration: const InputDecoration(labelText: 'Select Zone *'),
-                      items: zonesList.map((z) => DropdownMenuItem(value: z, child: Text(z))).toList(),
-                      onChanged: isSaving ? null : (val) => setDialogState(() => selectedZone = val!),
-                      validator: (v) => selectedSection == 'zonal' && (v == null || v.isEmpty) ? 'Required' : null,
+                      decoration: const InputDecoration(
+                        labelText: 'Select Zone *',
+                      ),
+                      items: zonesList
+                          .map(
+                            (z) => DropdownMenuItem(value: z, child: Text(z)),
+                          )
+                          .toList(),
+                      onChanged: isSaving
+                          ? null
+                          : (val) => setDialogState(() => selectedZone = val!),
+                      validator: (v) =>
+                          selectedSection == 'zonal' && (v == null || v.isEmpty)
+                          ? 'Required'
+                          : null,
                     ),
                   ],
                   const SizedBox(height: 16),
@@ -3748,14 +6178,27 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                                   }
                                 },
                           icon: const Icon(Icons.video_call),
-                          label: Text(videoBytes == null && video == null ? 'Pick Video *' : 'Change Video'),
+                          label: Text(
+                            videoBytes == null && video == null
+                                ? 'Pick Video *'
+                                : 'Change Video',
+                          ),
                         ),
                       ),
                     ],
                   ),
                   if (videoName.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    Text('Video: $videoName', style: const TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(
+                      'Video: $videoName',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.green,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                   const SizedBox(height: 16),
                   Row(
@@ -3774,49 +6217,91 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                                   }
                                 },
                           icon: const Icon(Icons.image),
-                          label: Text(thumbnailBytes == null && (video == null || video.thumbnailUrl.isEmpty) ? 'Pick Thumbnail' : 'Change Thumbnail'),
+                          label: Text(
+                            thumbnailBytes == null &&
+                                    (video == null ||
+                                        video.thumbnailUrl.isEmpty)
+                                ? 'Pick Thumbnail'
+                                : 'Change Thumbnail',
+                          ),
                         ),
                       ),
                     ],
                   ),
                   if (thumbnailName.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    Text('Thumbnail: $thumbnailName', style: const TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(
+                      'Thumbnail: $thumbnailName',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.green,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: descCtrl,
                     maxLines: 2,
-                    decoration: const InputDecoration(labelText: 'Description (Optional)'),
+                    decoration: const InputDecoration(
+                      labelText: 'Description (Optional)',
+                    ),
                   ),
                   if (isSaving) ...[
                     const SizedBox(height: 20),
                     if (videoBytes != null) ...[
-                      Text('Uploading Video: ${(videoProgress * 100).toInt()}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      Text(
+                        'Uploading Video: ${(videoProgress * 100).toInt()}%',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       const SizedBox(height: 4),
-                      LinearProgressIndicator(value: videoProgress, color: AppColors.brandPrimary),
+                      LinearProgressIndicator(
+                        value: videoProgress,
+                        color: AppColors.brandPrimary,
+                      ),
                       const SizedBox(height: 12),
                     ],
                     if (thumbnailBytes != null) ...[
-                      Text('Uploading Thumbnail: ${(thumbnailProgress * 100).toInt()}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      Text(
+                        'Uploading Thumbnail: ${(thumbnailProgress * 100).toInt()}%',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       const SizedBox(height: 4),
-                      LinearProgressIndicator(value: thumbnailProgress, color: Colors.amber),
+                      LinearProgressIndicator(
+                        value: thumbnailProgress,
+                        color: Colors.amber,
+                      ),
                       const SizedBox(height: 12),
                     ],
-                  ]
+                  ],
                 ],
               ),
             ),
           ),
           actions: [
-            TextButton(onPressed: isSaving ? null : () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: isSaving ? null : () => Navigator.pop(dialogCtx),
+              child: const Text('Cancel'),
+            ),
             ElevatedButton(
               onPressed: isSaving
                   ? null
                   : () async {
                       if (formKey.currentState!.validate()) {
                         if (video == null && videoBytes == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a video file.')));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please select a video file.'),
+                            ),
+                          );
                           return;
                         }
 
@@ -3828,41 +6313,60 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
                         try {
                           final newVideo = VideoModel(
-                            id: video?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                            id:
+                                video?.id ??
+                                DateTime.now().millisecondsSinceEpoch
+                                    .toString(),
                             title: titleCtrl.text.trim(),
                             description: descCtrl.text.trim(),
                             videoUrl: video?.videoUrl ?? '',
                             thumbnailUrl: video?.thumbnailUrl ?? '',
                             duration: video?.duration ?? 0,
-                            createdAt: video?.createdAt ?? DateTime.now().toIso8601String(),
+                            createdAt:
+                                video?.createdAt ??
+                                DateTime.now().toIso8601String(),
                             section: selectedSection,
-                            zone: selectedSection == 'zonal' ? selectedZone : '',
+                            zone: selectedSection == 'zonal'
+                                ? selectedZone
+                                : '',
                           );
 
                           bool success;
                           if (video == null) {
-                            success = await context.read<VideoProvider>().addVideo(
-                              newVideo,
-                              videoBytes,
-                              thumbnailBytes,
-                              onVideoProgress: (p) => setDialogState(() => videoProgress = p),
-                              onThumbnailProgress: (p) => setDialogState(() => thumbnailProgress = p),
-                            );
+                            success = await context
+                                .read<VideoProvider>()
+                                .addVideo(
+                                  newVideo,
+                                  videoBytes,
+                                  thumbnailBytes,
+                                  onVideoProgress: (p) =>
+                                      setDialogState(() => videoProgress = p),
+                                  onThumbnailProgress: (p) => setDialogState(
+                                    () => thumbnailProgress = p,
+                                  ),
+                                );
                             if (success && dialogCtx.mounted) {
-                              await dialogCtx.read<NotificationProvider>().sendSystemNotification(
-                                title: 'New Educational Video',
-                                body: newVideo.title,
-                                routingPath: AppRoutes.videos,
-                              );
+                              await dialogCtx
+                                  .read<NotificationProvider>()
+                                  .sendSystemNotification(
+                                    title: 'New Educational Video',
+                                    body: newVideo.title,
+                                    routingPath: AppRoutes.videos,
+                                  );
                             }
                           } else {
-                            success = await context.read<VideoProvider>().updateVideo(
-                              newVideo,
-                              videoBytes,
-                              thumbnailBytes,
-                              onVideoProgress: (p) => setDialogState(() => videoProgress = p),
-                              onThumbnailProgress: (p) => setDialogState(() => thumbnailProgress = p),
-                            );
+                            success = await context
+                                .read<VideoProvider>()
+                                .updateVideo(
+                                  newVideo,
+                                  videoBytes,
+                                  thumbnailBytes,
+                                  onVideoProgress: (p) =>
+                                      setDialogState(() => videoProgress = p),
+                                  onThumbnailProgress: (p) => setDialogState(
+                                    () => thumbnailProgress = p,
+                                  ),
+                                );
                           }
 
                           if (success && dialogCtx.mounted) {
@@ -3871,11 +6375,14 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                             setDialogState(() => isSaving = false);
                           }
                         } catch (e) {
-                          if (dialogCtx.mounted) setDialogState(() => isSaving = false);
+                          if (dialogCtx.mounted)
+                            setDialogState(() => isSaving = false);
                         }
                       }
                     },
-              child: isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text('Save'),
+              child: isSaving
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text('Save'),
             ),
           ],
         ),
@@ -3894,7 +6401,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
@@ -3902,9 +6412,18 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Upcoming Events (${events.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text(
+                'Upcoming Events (${events.length})',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
               ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.brandPrimary, foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brandPrimary,
+                  foregroundColor: Colors.white,
+                ),
                 onPressed: () => _showEventDialog(context),
                 icon: const Icon(Icons.event, size: 18),
                 label: const Text('Create Event'),
@@ -3914,52 +6433,73 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         ),
         Expanded(
           child: provider.isLoading
-              ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.brandPrimary,
+                  ),
+                )
               : events.isEmpty
-                  ? const Center(child: Text('No upcoming events scheduled.'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(AppSpacing.lg),
-                      itemCount: events.length,
-                      itemBuilder: (context, index) {
-                        final e = events[index];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: AppSpacing.md),
+              ? const Center(child: Text('No upcoming events scheduled.'))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  itemCount: events.length,
+                  itemBuilder: (context, index) {
+                    final e = events[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: AppRadius.borderMd,
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: Colors.green.shade50,
                             borderRadius: AppRadius.borderMd,
-                            border: Border.all(color: Colors.grey.shade200),
                           ),
-                          child: ListTile(
-                            leading: Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: AppRadius.borderMd),
-                              child: const Icon(Icons.event_available, color: Colors.green, size: 24),
-                            ),
-                            title: Text(e.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text('Date: ${e.date} | Venue: ${e.location}\nTime: ${e.time}'),
-                            isThreeLine: true,
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit, color: Colors.blue),
-                                  onPressed: () => _showEventDialog(context, event: e),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: AppColors.error),
-                                  onPressed: () => _confirmDelete(
-                                    context,
-                                    title: 'Delete Event',
-                                    content: 'Are you sure you want to delete ${e.title}?',
-                                    onConfirm: () => provider.deleteEvent(e.id),
-                                  ),
-                                ),
-                              ],
-                            ),
+                          child: const Icon(
+                            Icons.event_available,
+                            color: Colors.green,
+                            size: 24,
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                        title: Text(
+                          e.title,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          'Date: ${AppDateFormatter.formatToDateMonthYear(e.date)} | Venue: ${e.location}\nTime: ${e.time}',
+                        ),
+                        isThreeLine: true,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () =>
+                                  _showEventDialog(context, event: e),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete,
+                                color: AppColors.error,
+                              ),
+                              onPressed: () => _confirmDelete(
+                                context,
+                                title: 'Delete Event',
+                                content:
+                                    'Are you sure you want to delete ${e.title}?',
+                                onConfirm: () => provider.deleteEvent(e.id),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -3986,21 +6526,31 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 children: [
                   TextFormField(
                     controller: titleCtrl,
-                    decoration: const InputDecoration(labelText: 'Event Title *'),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Event Title *',
+                    ),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: venueCtrl,
-                    decoration: const InputDecoration(labelText: 'Venue / Location *'),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Venue / Location *',
+                    ),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: dateCtrl,
                     readOnly: true,
-                    decoration: const InputDecoration(labelText: 'Event Date *', suffixIcon: Icon(Icons.calendar_today)),
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Event Date *',
+                      suffixIcon: Icon(Icons.calendar_today),
+                    ),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Required' : null,
                     onTap: () async {
                       final picked = await showDatePicker(
                         context: context,
@@ -4009,52 +6559,75 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                         lastDate: DateTime(2100),
                       );
                       if (picked != null) {
-                        setDialogState(() => dateCtrl.text = DateFormat('yyyy-MM-dd').format(picked));
+                        setDialogState(
+                          () => dateCtrl.text = DateFormat(
+                            'yyyy-MM-dd',
+                          ).format(picked),
+                        );
                       }
                     },
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: timeCtrl,
-                    decoration: const InputDecoration(labelText: 'Time (e.g. 10:30 AM)'),
+                    decoration: const InputDecoration(
+                      labelText: 'Time (e.g. 10:30 AM)',
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: descCtrl,
                     maxLines: 2,
-                    decoration: const InputDecoration(labelText: 'Event Details'),
+                    decoration: const InputDecoration(
+                      labelText: 'Event Details',
+                    ),
                   ),
                 ],
               ),
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Cancel'),
+            ),
             ElevatedButton(
               onPressed: () async {
                 if (formKey.currentState!.validate()) {
                   final newEvent = EventModel(
-                    id: event?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                    id:
+                        event?.id ??
+                        DateTime.now().millisecondsSinceEpoch.toString(),
                     title: titleCtrl.text.trim(),
                     location: venueCtrl.text.trim(),
                     date: dateCtrl.text.trim(),
-                    time: timeCtrl.text.trim().isNotEmpty ? timeCtrl.text.trim() : '10:30 AM',
+                    time: timeCtrl.text.trim().isNotEmpty
+                        ? timeCtrl.text.trim()
+                        : '10:30 AM',
                     link: descCtrl.text.trim(),
-                    createdAt: event?.createdAt ?? DateTime.now().toIso8601String(),
+                    createdAt:
+                        event?.createdAt ?? DateTime.now().toIso8601String(),
                   );
 
                   bool success;
                   if (event == null) {
-                    success = await context.read<EventProvider>().addEvent(newEvent);
+                    success = await context.read<EventProvider>().addEvent(
+                      newEvent,
+                    );
                     if (success && dialogCtx.mounted) {
-                      await dialogCtx.read<NotificationProvider>().sendSystemNotification(
-                        title: 'New Upcoming Event',
-                        body: '${newEvent.title} on ${newEvent.date} at ${newEvent.location}',
-                        routingPath: AppRoutes.home,
-                      );
+                      await dialogCtx
+                          .read<NotificationProvider>()
+                          .sendSystemNotification(
+                            title: 'New Upcoming Event',
+                            body:
+                                '${newEvent.title} on ${newEvent.date} at ${newEvent.location}',
+                            routingPath: AppRoutes.home,
+                          );
                     }
                   } else {
-                    success = await context.read<EventProvider>().updateEvent(newEvent);
+                    success = await context.read<EventProvider>().updateEvent(
+                      newEvent,
+                    );
                   }
 
                   if (success && dialogCtx.mounted) Navigator.pop(dialogCtx);
@@ -4086,13 +6659,24 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Promotional Banner Ads (${ads.length})', style: AppTextStyle.headlineSm(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold)),
+                  Text(
+                    'Promotional Banner Ads (${ads.length})',
+                    style: AppTextStyle.headlineSm(
+                      color: AppColors.brandSecondary,
+                    ).copyWith(fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 4),
-                  const Text('Manage banner ads and promotional carousels displayed on member mobile home screens.', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                  const Text(
+                    'Manage banner ads and promotional carousels displayed on member mobile home screens.',
+                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                  ),
                 ],
               ),
               ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.brandPrimary, foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brandPrimary,
+                  foregroundColor: Colors.white,
+                ),
                 onPressed: () => _showAdDialog(context),
                 icon: const Icon(Icons.add_photo_alternate, size: 18),
                 label: const Text('Add New Ad'),
@@ -4102,73 +6686,111 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           const SizedBox(height: AppSpacing.xl),
 
           adProv.isLoading
-              ? const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary))
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.brandPrimary,
+                  ),
+                )
               : ads.isEmpty
-                  ? const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Text('No promotional ads added yet.', style: TextStyle(color: Colors.grey)),
-                      ),
-                    )
-                  : ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: ads.length,
-                      itemBuilder: (context, index) {
-                        final ad = ads[index];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: AppSpacing.md),
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: AppRadius.borderLg,
-                            border: Border.all(color: Colors.grey.shade200),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 120,
-                                height: 70,
-                                decoration: BoxDecoration(
-                                  borderRadius: AppRadius.borderMd,
-                                  color: Colors.grey.shade100,
-                                  image: ad.imageUrl.isNotEmpty
-                                      ? (ad.imageUrl.startsWith('http')
-                                          ? DecorationImage(image: NetworkImage(ad.imageUrl), fit: BoxFit.cover)
-                                          : DecorationImage(image: MemoryImage(base64Decode(ad.imageUrl)), fit: BoxFit.cover))
-                                      : null,
-                                ),
-                              ),
-                              const SizedBox(width: AppSpacing.md),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Banner Ad #${index + 1}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                                    if (ad.targetUrl != null && ad.targetUrl!.isNotEmpty)
-                                      Text('Target URL: ${ad.targetUrl}', style: const TextStyle(fontSize: 12, color: Colors.blue)),
-                                    Text('Created: ${ad.createdAt.split("T").first}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                                  ],
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.edit, color: Colors.blue),
-                                onPressed: () => _showAdDialog(context, ad: ad),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline, color: AppColors.error),
-                                onPressed: () => _confirmDelete(
-                                  context,
-                                  title: 'Delete Ad',
-                                  content: 'Are you sure you want to delete this ad?',
-                                  onConfirm: () => adProv.deleteAd(ad),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Text(
+                      'No promotional ads added yet.',
+                      style: TextStyle(color: Colors.grey),
                     ),
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: ads.length,
+                  itemBuilder: (context, index) {
+                    final ad = ads[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: AppRadius.borderLg,
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 120,
+                            height: 70,
+                            decoration: BoxDecoration(
+                              borderRadius: AppRadius.borderMd,
+                              color: Colors.grey.shade100,
+                              image: ad.imageUrl.isNotEmpty
+                                  ? (ad.imageUrl.startsWith('http')
+                                        ? DecorationImage(
+                                            image: NetworkImage(ad.imageUrl),
+                                            fit: BoxFit.cover,
+                                          )
+                                        : DecorationImage(
+                                            image: MemoryImage(
+                                              base64Decode(ad.imageUrl),
+                                            ),
+                                            fit: BoxFit.cover,
+                                          ))
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Banner Ad #${index + 1}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                if (ad.targetUrl != null &&
+                                    ad.targetUrl!.isNotEmpty)
+                                  Text(
+                                    'Target URL: ${ad.targetUrl}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.blue,
+                                    ),
+                                  ),
+                                Text(
+                                  'Created: ${AppDateFormatter.formatToDateMonthYear(ad.createdAt.split("T").first)}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.blue),
+                            onPressed: () => _showAdDialog(context, ad: ad),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: AppColors.error,
+                            ),
+                            onPressed: () => _confirmDelete(
+                              context,
+                              title: 'Delete Ad',
+                              content:
+                                  'Are you sure you want to delete this ad?',
+                              onConfirm: () => adProv.deleteAd(ad),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
         ],
       ),
     );
@@ -4194,7 +6816,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   GestureDetector(
                     onTap: () async {
                       final picker = ImagePicker();
-                      final img = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+                      final img = await picker.pickImage(
+                        source: ImageSource.gallery,
+                        imageQuality: 85,
+                      );
                       if (img != null) {
                         final bytes = await img.readAsBytes();
                         setDialogState(() => fileBytes = bytes);
@@ -4210,51 +6835,88 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                       ),
                       child: fileBytes != null
                           ? Image.memory(fileBytes!, fit: BoxFit.cover)
-                          : (existingImageUrl != null && existingImageUrl.isNotEmpty
-                              ? (existingImageUrl.startsWith('http')
-                                  ? Image.network(existingImageUrl, fit: BoxFit.cover)
-                                  : Image.memory(base64Decode(existingImageUrl), fit: BoxFit.cover))
-                              : const Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.add_photo_alternate, size: 36, color: Colors.grey),
-                                    SizedBox(height: 8),
-                                    Text('Pick banner image *', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                                  ],
-                                )),
+                          : (existingImageUrl != null &&
+                                    existingImageUrl.isNotEmpty
+                                ? (existingImageUrl.startsWith('http')
+                                      ? Image.network(
+                                          existingImageUrl,
+                                          fit: BoxFit.cover,
+                                        )
+                                      : Image.memory(
+                                          base64Decode(existingImageUrl),
+                                          fit: BoxFit.cover,
+                                        ))
+                                : const Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.add_photo_alternate,
+                                        size: 36,
+                                        color: Colors.grey,
+                                      ),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        'Pick banner image *',
+                                        style: TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  )),
                     ),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: urlCtrl,
-                    decoration: const InputDecoration(labelText: 'Target Link / URL (Optional)'),
+                    decoration: const InputDecoration(
+                      labelText: 'Target Link / URL (Optional)',
+                    ),
                   ),
                 ],
               ),
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Cancel'),
+            ),
             ElevatedButton(
               onPressed: () async {
                 if (formKey.currentState!.validate()) {
                   if (ad == null && fileBytes == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select an ad banner image.')));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please select an ad banner image.'),
+                      ),
+                    );
                     return;
                   }
 
                   final newAd = AdModel(
-                    id: ad?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                    id:
+                        ad?.id ??
+                        DateTime.now().millisecondsSinceEpoch.toString(),
                     imageUrl: ad?.imageUrl ?? '',
-                    targetUrl: urlCtrl.text.trim().isNotEmpty ? urlCtrl.text.trim() : null,
-                    createdAt: ad?.createdAt ?? DateTime.now().toIso8601String(),
+                    targetUrl: urlCtrl.text.trim().isNotEmpty
+                        ? urlCtrl.text.trim()
+                        : null,
+                    createdAt:
+                        ad?.createdAt ?? DateTime.now().toIso8601String(),
                   );
 
                   bool success;
                   if (ad == null) {
-                    success = await context.read<AdProvider>().addAd(newAd, fileBytes!);
+                    success = await context.read<AdProvider>().addAd(
+                      newAd,
+                      fileBytes!,
+                    );
                   } else {
-                    success = await context.read<AdProvider>().updateAd(newAd, fileBytes);
+                    success = await context.read<AdProvider>().updateAd(
+                      newAd,
+                      fileBytes,
+                    );
                   }
 
                   if (success && dialogCtx.mounted) Navigator.pop(dialogCtx);
@@ -4277,9 +6939,17 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Portal Configuration', style: AppTextStyle.headlineSm(color: AppColors.brandSecondary).copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            'Portal Configuration',
+            style: AppTextStyle.headlineSm(
+              color: AppColors.brandSecondary,
+            ).copyWith(fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 4),
-          const Text('Configure administration policies, validation rules, and offline systems.', style: TextStyle(color: Colors.grey, fontSize: 13)),
+          const Text(
+            'Configure administration policies, validation rules, and offline systems.',
+            style: TextStyle(color: Colors.grey, fontSize: 13),
+          ),
           const SizedBox(height: AppSpacing.xl),
 
           Container(
@@ -4291,18 +6961,37 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             ),
             child: Column(
               children: [
-
                 ListTile(
-                  title: const Text('Security Clearance Level', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.brandSecondary)),
-                  subtitle: const Text('Root clearance required to modify administrative authority'),
+                  title: const Text(
+                    'Security Clearance Level',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.brandSecondary,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Root clearance required to modify administrative authority',
+                  ),
                   trailing: DropdownButton<String>(
                     value: _clearanceLevel,
                     underline: const SizedBox(),
                     items: const [
-                      DropdownMenuItem(value: 'General', child: Text('General')),
-                      DropdownMenuItem(value: 'Supervisor', child: Text('Supervisor')),
-                      DropdownMenuItem(value: 'State Committee', child: Text('State Committee')),
-                      DropdownMenuItem(value: 'Superadmin', child: Text('Superadmin (Root)')),
+                      DropdownMenuItem(
+                        value: 'General',
+                        child: Text('General'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Supervisor',
+                        child: Text('Supervisor'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'State Committee',
+                        child: Text('State Committee'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Superadmin',
+                        child: Text('Superadmin (Root)'),
+                      ),
                     ],
                     onChanged: (val) {
                       if (val != null) setState(() => _clearanceLevel = val);
@@ -4321,16 +7010,27 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   // Helper Confirm Delete Dialog
   // ==========================================
 
-  void _confirmDelete(BuildContext context, {required String title, required String content, required VoidCallback onConfirm}) {
+  void _confirmDelete(
+    BuildContext context, {
+    required String title,
+    required String content,
+    required VoidCallback onConfirm,
+  }) {
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
         title: Text(title),
         content: Text(content),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () {
               onConfirm();
               Navigator.pop(dialogCtx);

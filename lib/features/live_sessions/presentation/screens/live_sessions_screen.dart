@@ -7,9 +7,9 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_style.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/routes/app_routes.dart';
-import '../providers/live_sessions_provider.dart';
-
 import '../../../../core/widgets/compact_app_bar.dart';
+import '../../../../core/utils/app_date_formatter.dart';
+import '../providers/live_sessions_provider.dart';
 
 class LiveSessionsScreen extends StatefulWidget {
   const LiveSessionsScreen({super.key});
@@ -155,7 +155,7 @@ class _LiveSessionsScreenState extends State<LiveSessionsScreen> {
                                                     ),
                                                   ),
                                                   Text(
-                                                    s.date,
+                                                    AppDateFormatter.formatToDateMonthYear(s.date),
                                                     style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold),
                                                   ),
                                                 ],

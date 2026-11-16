@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/utils/committee_helper.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../../auth/data/models/admin_model.dart';
 import '../../data/repositories/admin_repository.dart';
@@ -18,8 +19,8 @@ class AdminProvider extends ChangeNotifier {
   AdminProvider({
     required AdminRepository adminRepository,
     required SharedPreferences prefs,
-  })  : _adminRepository = adminRepository,
-        _prefs = prefs;
+  }) : _adminRepository = adminRepository,
+       _prefs = prefs;
 
   AdminModel? _currentAdmin;
   List<AdminModel> _admins = [];
@@ -38,7 +39,8 @@ class AdminProvider extends ChangeNotifier {
   final Set<String> _loadingImageUids = {};
 
   AdminModel? get currentAdmin => _currentAdmin;
-  bool get isZonalAdmin => _currentAdmin != null && _currentAdmin!.role == 'zonal_admin';
+  bool get isZonalAdmin =>
+      _currentAdmin != null && _currentAdmin!.role == 'zonal_admin';
   String? get zonalAdminZone => _currentAdmin?.zone;
   List<AdminModel> get admins => _admins;
   List<String> get zones => _zones;
@@ -92,30 +94,46 @@ class AdminProvider extends ChangeNotifier {
       return _pendingUsers;
     }
     final targetZone = _selectedZoneFilter.trim();
-    debugPrint('Filtering pending users for selected zone filter: "$targetZone"');
-    final filtered = _pendingUsers.where((u) => _matchesZone(u.zone, targetZone)).toList();
+    debugPrint(
+      'Filtering pending users for selected zone filter: "$targetZone"',
+    );
+    final filtered = _pendingUsers
+        .where((u) => _matchesZone(u.zone, targetZone))
+        .toList();
     debugPrint('Filtered pending users count: ${filtered.length}');
     return filtered;
   }
 
   List<UserModel> get approvedUsers {
-    debugPrint('approvedUsers called. Total raw users: ${_approvedUsers.length}');
+    debugPrint(
+      'approvedUsers called. Total raw users: ${_approvedUsers.length}',
+    );
     if (isZonalAdmin) {
       final zone = zonalAdminZone;
       if (zone == null || zone.trim().isEmpty) return [];
-      final filtered = _approvedUsers.where((u) => _matchesZone(u.zone, zone)).toList();
-      debugPrint('Zonal Admin ($zone) approved users count: ${filtered.length}');
+      final filtered = _approvedUsers
+          .where((u) => _matchesZone(u.zone, zone))
+          .toList();
+      debugPrint(
+        'Zonal Admin ($zone) approved users count: ${filtered.length}',
+      );
       return filtered;
     }
     if (_selectedZoneFilter == 'All Zones' || _selectedZoneFilter.isEmpty) {
       return _approvedUsers;
     }
     final targetZone = _selectedZoneFilter.trim();
-    debugPrint('Filtering approved users for selected zone filter: "$targetZone"');
-    final filtered = _approvedUsers.where((u) => _matchesZone(u.zone, targetZone)).toList();
+    debugPrint(
+      'Filtering approved users for selected zone filter: "$targetZone"',
+    );
+    final filtered = _approvedUsers
+        .where((u) => _matchesZone(u.zone, targetZone))
+        .toList();
     debugPrint('Filtered approved users count: ${filtered.length}');
     return filtered;
   }
+
+  List<UserModel> get rawApprovedUsers => _approvedUsers;
 
   List<UserModel> get rejectedUsers {
     if (isZonalAdmin) {
@@ -125,8 +143,11 @@ class AdminProvider extends ChangeNotifier {
       return _rejectedUsers;
     }
     final targetZone = _selectedZoneFilter.trim();
-    return _rejectedUsers.where((u) => _matchesZone(u.zone, targetZone)).toList();
+    return _rejectedUsers
+        .where((u) => _matchesZone(u.zone, targetZone))
+        .toList();
   }
+
   bool get isLoading => _isLoading;
   String? get error => _error;
   Map<String, String> get userImages => _userImages;
@@ -157,7 +178,9 @@ class AdminProvider extends ChangeNotifier {
       if (jsonStr != null && jsonStr.isNotEmpty) {
         final decoded = jsonDecode(jsonStr);
         _currentAdmin = AdminModel.fromJson(Map<String, dynamic>.from(decoded));
-        if (_currentAdmin?.role == 'zonal_admin' && _currentAdmin?.zone != null && _currentAdmin!.zone!.isNotEmpty) {
+        if (_currentAdmin?.role == 'zonal_admin' &&
+            _currentAdmin?.zone != null &&
+            _currentAdmin!.zone!.isNotEmpty) {
           _selectedZoneFilter = _currentAdmin!.zone!;
         }
         notifyListeners();
@@ -168,7 +191,11 @@ class AdminProvider extends ChangeNotifier {
   }
 
   /// Logs in administrative credentials.
-  Future<bool> loginAdmin(String username, String password, {String? allowedRole}) async {
+  Future<bool> loginAdmin(
+    String username,
+    String password, {
+    String? allowedRole,
+  }) async {
     _setLoading(true);
     _setError(null);
     try {
@@ -176,21 +203,28 @@ class AdminProvider extends ChangeNotifier {
       if (admin != null && admin.password == password) {
         if (allowedRole != null && admin.role != allowedRole) {
           if (allowedRole == 'zonal_admin' && admin.role == 'super_admin') {
-            _setError('Access denied: Please use the Super Admin login portal.');
-          } else if (allowedRole == 'super_admin' && admin.role == 'zonal_admin') {
-            _setError('Access denied: Please use the Zonal Admin login portal.');
+            _setError(
+              'Access denied: Please use the Super Admin login portal.',
+            );
+          } else if (allowedRole == 'super_admin' &&
+              admin.role == 'zonal_admin') {
+            _setError(
+              'Access denied: Please use the Zonal Admin login portal.',
+            );
           } else {
             _setError('Access denied: Unauthorized role.');
           }
           return false;
         }
         _currentAdmin = admin;
-        if (admin.role == 'zonal_admin' && admin.zone != null && admin.zone!.isNotEmpty) {
+        if (admin.role == 'zonal_admin' &&
+            admin.zone != null &&
+            admin.zone!.isNotEmpty) {
           _selectedZoneFilter = admin.zone!;
         } else {
           _selectedZoneFilter = 'All Zones';
         }
-        
+
         // Cache admin session details locally
         final jsonStr = jsonEncode(admin.toJson());
         await _prefs.setString(_cachedAdminKey, jsonStr);
@@ -224,7 +258,9 @@ class AdminProvider extends ChangeNotifier {
     try {
       await _ensureAuthSession();
       _pendingUsers = await _adminRepository.getPendingUsers();
-      print('📥 [AdminProvider] _pendingUsers populated with ${_pendingUsers.length} raw items.');
+      print(
+        '📥 [AdminProvider] _pendingUsers populated with ${_pendingUsers.length} raw items.',
+      );
     } catch (e) {
       print('❌ [AdminProvider] fetchPendingUsers error: $e');
       _setError('Failed to fetch pending users: ${e.toString()}');
@@ -238,26 +274,32 @@ class AdminProvider extends ChangeNotifier {
     _setError(null);
     try {
       final reviewerName = _currentAdmin != null
-          ? (_currentAdmin!.role == 'super_admin' ? 'Super Admin (${_currentAdmin!.username})' : '${_currentAdmin!.username} (Zonal Admin)')
+          ? (_currentAdmin!.role == 'super_admin'
+                ? 'Super Admin (${_currentAdmin!.username})'
+                : '${_currentAdmin!.username} (Zonal Admin)')
           : 'Admin';
       final reviewerId = _currentAdmin?.username ?? 'admin';
-      final reviewedAtStr = DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now());
+      final reviewedAtStr = DateFormat(
+        'dd-MM-yyyy HH:mm',
+      ).format(DateTime.now());
 
       final userIndex = _pendingUsers.indexWhere((u) => u.uid == uid);
       String? assignedMembershipId;
       if (userIndex != -1) {
         final pendingUser = _pendingUsers[userIndex];
         assignedMembershipId = pendingUser.membershipId;
-        if ((assignedMembershipId == null || assignedMembershipId.trim().isEmpty) &&
+        if ((assignedMembershipId == null ||
+                assignedMembershipId.trim().isEmpty) &&
             pendingUser.zone != null &&
             pendingUser.zone!.isNotEmpty) {
-          assignedMembershipId = await _adminRepository.generateNextMembershipId(pendingUser.zone!);
+          assignedMembershipId = await _adminRepository
+              .generateNextMembershipId(pendingUser.zone!);
         }
       }
 
       await _adminRepository.updateUserStatus(
-        uid, 
-        'approved', 
+        uid,
+        'approved',
         true,
         reviewedByName: reviewerName,
         reviewedById: reviewerId,
@@ -267,12 +309,13 @@ class AdminProvider extends ChangeNotifier {
 
       if (userIndex != -1) {
         final user = _pendingUsers[userIndex].copyWith(
-          status: 'approved', 
+          status: 'approved',
           isApproved: true,
           reviewedByName: reviewerName,
           reviewedById: reviewerId,
           reviewedAt: reviewedAtStr,
-          membershipId: assignedMembershipId ?? _pendingUsers[userIndex].membershipId,
+          membershipId:
+              assignedMembershipId ?? _pendingUsers[userIndex].membershipId,
         );
         _pendingUsers.removeAt(userIndex);
         _approvedUsers.removeWhere((u) => u.uid == uid);
@@ -292,14 +335,18 @@ class AdminProvider extends ChangeNotifier {
     _setError(null);
     try {
       final reviewerName = _currentAdmin != null
-          ? (_currentAdmin!.role == 'super_admin' ? 'Super Admin (${_currentAdmin!.username})' : '${_currentAdmin!.username} (Zonal Admin)')
+          ? (_currentAdmin!.role == 'super_admin'
+                ? 'Super Admin (${_currentAdmin!.username})'
+                : '${_currentAdmin!.username} (Zonal Admin)')
           : 'Admin';
       final reviewerId = _currentAdmin?.username ?? 'admin';
-      final reviewedAtStr = DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now());
+      final reviewedAtStr = DateFormat(
+        'dd-MM-yyyy HH:mm',
+      ).format(DateTime.now());
 
       await _adminRepository.updateUserStatus(
-        uid, 
-        'rejected', 
+        uid,
+        'rejected',
         false,
         reviewedByName: reviewerName,
         reviewedById: reviewerId,
@@ -308,7 +355,7 @@ class AdminProvider extends ChangeNotifier {
       final userIndex = _pendingUsers.indexWhere((u) => u.uid == uid);
       if (userIndex != -1) {
         final user = _pendingUsers[userIndex].copyWith(
-          status: 'rejected', 
+          status: 'rejected',
           isApproved: false,
           reviewedByName: reviewerName,
           reviewedById: reviewerId,
@@ -347,7 +394,8 @@ class AdminProvider extends ChangeNotifier {
   /// Lazy-loads user profile image base64 on-demand.
   Future<void> fetchUserImage(String profileImageId, String userUid) async {
     if (profileImageId.startsWith('http')) return;
-    if (_userImages.containsKey(userUid) || _loadingImageUids.contains(userUid)) {
+    if (_userImages.containsKey(userUid) ||
+        _loadingImageUids.contains(userUid)) {
       return;
     }
 
@@ -400,10 +448,46 @@ class AdminProvider extends ChangeNotifier {
     _setError(null);
     try {
       await _adminRepository.updateUser(user);
-      final idx = _approvedUsers.indexWhere((u) => u.uid == user.uid);
-      if (idx != -1) {
-        _approvedUsers[idx] = user;
+
+      // Update in pendingUsers if present
+      final pendingIdx = _pendingUsers.indexWhere((u) => u.uid == user.uid);
+      if (pendingIdx != -1) {
+        if (user.status == 'pending') {
+          _pendingUsers[pendingIdx] = user;
+        } else {
+          _pendingUsers.removeAt(pendingIdx);
+        }
       }
+
+      // Update in approvedUsers if present
+      final approvedIdx = _approvedUsers.indexWhere((u) => u.uid == user.uid);
+      if (approvedIdx != -1) {
+        if (user.status == 'approved') {
+          _approvedUsers[approvedIdx] = user;
+        } else {
+          _approvedUsers.removeAt(approvedIdx);
+        }
+      }
+
+      // Update in rejectedUsers if present
+      final rejectedIdx = _rejectedUsers.indexWhere((u) => u.uid == user.uid);
+      if (rejectedIdx != -1) {
+        if (user.status == 'rejected') {
+          _rejectedUsers[rejectedIdx] = user;
+        } else {
+          _rejectedUsers.removeAt(rejectedIdx);
+        }
+      }
+
+      // If status changed to a new list, insert if not already present
+      if (user.status == 'approved' && !_approvedUsers.any((u) => u.uid == user.uid)) {
+        _approvedUsers.add(user);
+      } else if (user.status == 'pending' && !_pendingUsers.any((u) => u.uid == user.uid)) {
+        _pendingUsers.add(user);
+      } else if (user.status == 'rejected' && !_rejectedUsers.any((u) => u.uid == user.uid)) {
+        _rejectedUsers.add(user);
+      }
+
       notifyListeners();
       return true;
     } catch (e) {
@@ -412,48 +496,100 @@ class AdminProvider extends ChangeNotifier {
     }
   }
 
-  /// Explicitly adds or updates a member's role in the State Committee or Executive Committee.
+  /// Saves a user profile image and synchronizes local cache.
+  Future<void> saveUserImage(String profileImageId, String imageBase64, String userUid) async {
+    await _adminRepository.saveUserImage(profileImageId, imageBase64);
+    _userImages[userUid] = imageBase64;
+    notifyListeners();
+  }
+
+  /// Explicitly adds or updates a member's role in the State Committee, Executive Committee, or Zonal Committee.
   Future<bool> addMemberToCommittee({
     required String uid,
-    required bool isState,
+    bool? isState,
+    CommitteeType? type,
     required String role,
+    String? zone,
   }) async {
     final userIdx = _approvedUsers.indexWhere((u) => u.uid == uid);
     if (userIdx == -1) return false;
 
     final user = _approvedUsers[userIdx];
-    final updatedUser = isState
-        ? user.copyWith(stateCommitteeRole: role)
-        : user.copyWith(executiveCommitteeRole: role);
+    final effectiveType =
+        type ??
+        (isState == true ? CommitteeType.state : CommitteeType.executive);
+
+    UserModel updatedUser;
+    switch (effectiveType) {
+      case CommitteeType.state:
+        updatedUser = user.copyWith(stateCommitteeRole: role);
+        break;
+      case CommitteeType.executive:
+        updatedUser = user.copyWith(executiveCommitteeRole: role);
+        break;
+      case CommitteeType.zonal:
+        updatedUser = user.copyWith(
+          zonalCommitteeRole: role,
+          zone: (zone != null && zone.isNotEmpty) ? zone : user.zone,
+        );
+        break;
+    }
 
     return await updateUser(updatedUser);
   }
 
-  /// Removes a member from the State Committee or Executive Committee.
+  /// Removes a member from the State Committee, Executive Committee, or Zonal Committee.
   Future<bool> removeMemberFromCommittee({
     required String uid,
-    required bool isState,
+    bool? isState,
+    CommitteeType? type,
   }) async {
     final userIdx = _approvedUsers.indexWhere((u) => u.uid == uid);
     if (userIdx == -1) return false;
 
     final user = _approvedUsers[userIdx];
-    String? newDesignation = user.designation;
-    if (isState && (user.designation?.trim().toLowerCase() == 'state committee member')) {
-      newDesignation = 'Member';
-    } else if (!isState && (user.designation?.trim().toLowerCase() == 'executive committee member' || user.designation?.trim().toLowerCase() == 'executive commitee member')) {
-      newDesignation = 'Member';
-    }
+    final effectiveType =
+        type ??
+        (isState == true ? CommitteeType.state : CommitteeType.executive);
 
-    final updatedUser = isState
-        ? user.copyWith(
-            designation: newDesignation,
-            clearStateCommitteeRole: true,
-          )
-        : user.copyWith(
-            designation: newDesignation,
-            clearExecutiveCommitteeRole: true,
-          );
+    String? newDesignation = user.designation;
+    UserModel updatedUser;
+
+    switch (effectiveType) {
+      case CommitteeType.state:
+        if (user.designation?.trim().toLowerCase() ==
+            'state committee member') {
+          newDesignation = 'Member';
+        }
+        updatedUser = user.copyWith(
+          designation: newDesignation,
+          clearStateCommitteeRole: true,
+        );
+        break;
+      case CommitteeType.executive:
+        if (user.designation?.trim().toLowerCase() ==
+                'executive committee member' ||
+            user.designation?.trim().toLowerCase() ==
+                'executive commitee member') {
+          newDesignation = 'Member';
+        }
+        updatedUser = user.copyWith(
+          designation: newDesignation,
+          clearExecutiveCommitteeRole: true,
+        );
+        break;
+      case CommitteeType.zonal:
+        if (user.designation?.trim().toLowerCase() ==
+                'zonal committee member' ||
+            user.designation?.trim().toLowerCase() == 'zonal commitee member') {
+          newDesignation = 'Member';
+        }
+        updatedUser = user.copyWith(
+          designation: newDesignation,
+          clearZonalCommitteeRole: true,
+        );
+        break;
+    }
 
     return await updateUser(updatedUser);
   }

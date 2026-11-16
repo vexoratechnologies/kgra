@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/widgets/app_pdf_viewer_screen.dart';
+import '../../../../core/utils/app_date_formatter.dart';
 import '../../../ads/presentation/widgets/ad_carousel_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../events/presentation/providers/event_provider.dart';
@@ -1067,7 +1068,9 @@ class _HomeScreenState extends State<HomeScreen> {
         final item = displayUpdates[index];
         final String title = item is _MockUpdate ? item.title : (item as UpdateModel).title;
         final String subtitle = item is _MockUpdate ? item.subtitle : (item as UpdateModel).content;
-        final String dateStr = item is _MockUpdate ? item.time : (item as UpdateModel).date;
+        final String dateStr = item is _MockUpdate
+            ? item.time
+            : AppDateFormatter.formatToDateMonthYear((item as UpdateModel).date);
         final bool showNewBadge = item is _MockUpdate ? item.isNew : index == 0;
 
         return PressScaleWidget(

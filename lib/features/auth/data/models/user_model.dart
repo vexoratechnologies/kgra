@@ -24,6 +24,7 @@ class UserModel {
   final List<String>? designations;
   final String? stateCommitteeRole;
   final String? executiveCommitteeRole;
+  final String? zonalCommitteeRole;
 
   const UserModel({
     required this.uid,
@@ -33,6 +34,7 @@ class UserModel {
     this.designations,
     this.stateCommitteeRole,
     this.executiveCommitteeRole,
+    this.zonalCommitteeRole,
     this.institution,
     this.profileImageId,
     this.isApproved = false,
@@ -93,8 +95,10 @@ class UserModel {
     String? reviewedAt,
     String? stateCommitteeRole,
     String? executiveCommitteeRole,
+    String? zonalCommitteeRole,
     bool clearStateCommitteeRole = false,
     bool clearExecutiveCommitteeRole = false,
+    bool clearZonalCommitteeRole = false,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -104,6 +108,7 @@ class UserModel {
       designations: designations ?? this.designations,
       stateCommitteeRole: clearStateCommitteeRole ? null : (stateCommitteeRole ?? this.stateCommitteeRole),
       executiveCommitteeRole: clearExecutiveCommitteeRole ? null : (executiveCommitteeRole ?? this.executiveCommitteeRole),
+      zonalCommitteeRole: clearZonalCommitteeRole ? null : (zonalCommitteeRole ?? this.zonalCommitteeRole),
       institution: institution ?? this.institution,
       profileImageId: profileImageId ?? this.profileImageId,
       isApproved: isApproved ?? this.isApproved,
@@ -156,6 +161,7 @@ class UserModel {
       designations: parsedDesignations,
       stateCommitteeRole: json['stateCommitteeRole'] as String?,
       executiveCommitteeRole: json['executiveCommitteeRole'] as String?,
+      zonalCommitteeRole: json['zonalCommitteeRole'] as String?,
       institution: json['institution'] as String?,
       profileImageId: json['profileImageId'] as String?,
       isApproved: json['isApproved'] as bool? ?? false,
@@ -187,6 +193,7 @@ class UserModel {
       'designations': effectiveDesignations,
       'stateCommitteeRole': stateCommitteeRole,
       'executiveCommitteeRole': executiveCommitteeRole,
+      'zonalCommitteeRole': zonalCommitteeRole,
       'institution': institution,
       'profileImageId': profileImageId,
       'isApproved': isApproved,

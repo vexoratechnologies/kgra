@@ -22,7 +22,7 @@ class PaymentConfigModel {
     this.razorpayKeyId = 'rzp_test_TfREKwuczLH0HV',
     this.razorpayKeySecret = '6PRLktauO7P5CC0eO9q7EYlH',
     this.infoMessageIos = 'To renew or process association membership dues on iOS, please visit the official KGRA web portal or contact your district committee.',
-    this.annualMembershipAmount = 1000.0,
+    this.annualMembershipAmount = 1500.0,
     this.membershipTitle = 'Annual Membership',
     this.membershipDescription = 'Standard annual association subscription for 12 months.',
     this.membershipPurpose = 'ANNUAL_MEMBERSHIP_FEE',
@@ -256,7 +256,7 @@ class PaymentConfigModel {
       razorpayKeySecret: rawRazorpaySecret?.toString() ?? '6PRLktauO7P5CC0eO9q7EYlH',
       infoMessageIos: rawInfoMessageIos?.toString() ??
           'To renew or process association membership dues on iOS, please visit the official KGRA web portal or contact your district committee.',
-      annualMembershipAmount: _parseDouble(rawAmount, 1000.0),
+      annualMembershipAmount: _parseDouble(rawAmount, 1500.0),
       membershipTitle: rawTitle?.toString() ?? 'Annual Membership',
       membershipDescription: rawDescription?.toString() ??
           'Standard annual association subscription for 12 months.',

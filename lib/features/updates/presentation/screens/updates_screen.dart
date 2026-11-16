@@ -7,6 +7,7 @@ import '../../../../core/theme/app_text_style.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/widgets/compact_app_bar.dart';
+import '../../../../core/utils/app_date_formatter.dart';
 import '../providers/updates_provider.dart';
 
 class UpdatesScreen extends StatefulWidget {
@@ -134,7 +135,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                                           ),
                                           const SizedBox(width: 8),
                                           Text(
-                                            u.date,
+                                            AppDateFormatter.formatToDateMonthYear(u.date),
                                             style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold),
                                           ),
                                         ],

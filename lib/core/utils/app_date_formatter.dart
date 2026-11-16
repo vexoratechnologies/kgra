@@ -10,10 +10,25 @@ class AppDateFormatter {
     final trimmed = dateStr.trim();
     try {
       if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(trimmed)) {
-        final dt = DateTime.parse(trimmed);
+        final dt = DateTime.parse(trimmed.contains(' ') ? trimmed.replaceAll(' ', 'T') : trimmed);
         return DateFormat('dd-MM-yyyy').format(dt);
       }
     } catch (_) {}
     return trimmed;
   }
+
+  /// Formats date-time strings to 'dd-MM-yyyy HH:mm'.
+  /// Gracefully converts 'yyyy-MM-dd HH:mm' or ISO strings.
+  static String formatToDateTime(String? dateStr, {String fallback = ''}) {
+    if (dateStr == null || dateStr.trim().isEmpty) return fallback;
+    final trimmed = dateStr.trim();
+    try {
+      if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(trimmed)) {
+        final dt = DateTime.parse(trimmed.contains(' ') ? trimmed.replaceAll(' ', 'T') : trimmed);
+        return DateFormat('dd-MM-yyyy HH:mm').format(dt);
+      }
+    } catch (_) {}
+    return trimmed;
+  }
 }
+
